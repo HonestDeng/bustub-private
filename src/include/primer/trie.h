@@ -119,7 +119,8 @@ class Trie {
   // 3. Otherwise, return the value.
   template <class T>
   auto Get(std::string_view key) const -> const T *;
-
+  template <class T>
+  std::shared_ptr<const TrieNode> walk(std::string_view key) const;
   // Put a new key-value pair into the trie. If the key already exists, overwrite the value.
   // Returns the new trie.
   template <class T>
