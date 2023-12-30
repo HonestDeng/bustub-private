@@ -1,6 +1,7 @@
 #include "primer/trie.h"
 #include <string_view>
 #include "common/exception.h"
+#include "common/macros.h"
 
 namespace bustub {
 
@@ -12,6 +13,10 @@ auto Trie::Get(std::string_view key) const -> const T * {
   // nullptr. After you find the node, you should use `dynamic_cast` to cast it to `const TrieNodeWithValue<T> *`. If
   // dynamic_cast returns `nullptr`, it means the type of the value is mismatched, and you should return nullptr.
   // Otherwise, return the value.
+  if(!this->root_){
+    // if the root node is nullptr
+    return nullptr;
+  }
   auto cur = this->root_;
   for (const auto &c : key) {
     if (!cur) {
@@ -95,10 +100,50 @@ auto Trie::Put(std::string_view key, T value) const -> Trie {
 }
 
 auto Trie::Remove(std::string_view key) const -> Trie {
-  throw NotImplementedException("Trie::Remove is not implemented.");
+  //  throw NotImplementedException("Trie::Remove is not implemented.");
 
   // You should walk through the trie and remove nodes if necessary. If the node doesn't contain a value any more,
   // you should convert it to `TrieNode`. If a node doesn't have children any more, you should remove it.
+  // if the key is empty
+  if (key.empty()) {
+    std::shared_ptr<TrieNode> new_root = root_->Clone();
+    new_root = std::make_shared<TrieNode>(new_root->children_);
+    return Trie(new_root);
+  }
+
+  std::shared_ptr<TrieNode> cur = this->root_->Clone();
+  std::vector<std::shared_ptr<TrieNode>> path;
+  int len = static_cast<int>(key.length());
+  for (int i = 0; i < len; i++) {  // walk through the tree to find the end node for the key
+    auto c = key[i];
+    path.emplace_back(cur);
+    if (!cur->children_[c]) {
+      // the key does not exist
+      return Trie(path.front());
+    }
+    std::shared_ptr<TrieNode> tmp = cur->children_[c]->Clone();
+    cur->children_[c] = tmp;
+    cur = tmp;
+  }
+  // cur is the end node, and cur not in path
+  cur = std::make_shared<TrieNode>(cur->children_);
+  path.back()->children_[key[len-1]] = cur;
+
+  for(int i = len - 1; i >= 0; i--){
+    auto c = key[i];
+    auto parent = path.back();
+    if(cur->children_.empty() && !cur->is_value_node_) {
+      // 如果cur节点没有儿子并且不带有value，则cur的父亲要跟cur断绝关系
+      parent->children_.erase(c);
+    }
+    cur = parent;
+    path.pop_back();
+  }
+  if(cur->children_.empty() && !cur->is_value_node_){
+    return Trie(nullptr);
+  }
+
+  return Trie(cur);
 }
 
 // Below are explicit instantiation of template functions.
