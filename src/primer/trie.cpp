@@ -42,18 +42,6 @@ auto Trie::Get(std::string_view key) const -> const T * {
 }
 
 template <class T>
-std::shared_ptr<const TrieNode> Trie::walk(std::string_view key) const {
-  auto cur = this->root_;
-  for (const auto &c : key) {
-    if (!cur) {
-      // the key does not exist
-      return nullptr;
-    }
-    cur = cur->children_.at(c);
-  }
-  return cur;
-}
-template <class T>
 auto Trie::Put(std::string_view key, T value) const -> Trie {
   // Note that `T` might be a non-copyable type. Always use `std::move` when creating `shared_ptr` on that value.
   //  throw NotImplementedException("Trie::Put is not implemented.");
