@@ -14,8 +14,11 @@ auto Trie::Get(std::string_view key) const -> const T * {
   // Otherwise, return the value.
   auto cur = this->root_;
   for (const auto &c : key) {
-    if (cur) {
+    if (!cur) {
       // the key does not exist
+      return nullptr;
+    }
+    if (cur->children_.count(c) == 0) {
       return nullptr;
     }
     cur = cur->children_.at(c);  // walk through the tree
@@ -25,7 +28,7 @@ auto Trie::Get(std::string_view key) const -> const T * {
     // the key does not exist
     return nullptr;
   }
-  auto target = dynamic_cast<const TrieNodeWithValue<T> *>(cur.get());
+  auto target = std::dynamic_pointer_cast<const TrieNodeWithValue<T>>(cur);
   if (target == nullptr) {
     // type mismatch
     return nullptr;
@@ -52,38 +55,42 @@ auto Trie::Put(std::string_view key, T value) const -> Trie {
 
   // You should walk through the trie and create new nodes if necessary. If the node corresponding to the key already
   // exists, you should create a new `TrieNodeWithValue`.
-  std::vector<std::shared_ptr<const TrieNode>> path;
-  std::shared_ptr<const TrieNode> cur = this->root_;
-  // find the existing path
-  int i = 0;
-  for (; i - key.length() < 0; i++) {
+
+  // the key is empty
+  if (key.empty()) {
+    std::shared_ptr<TrieNode> new_root = root_->Clone();
+    new_root = std::make_shared<TrieNodeWithValue<T>>(new_root->children_, std::make_shared<T>(std::move(value)));
+    return Trie(new_root);
+  }
+
+  std::shared_ptr<TrieNode> cur;
+  if (this->root_) {
+    cur = this->root_->Clone();
+  } else {
+    cur = std::make_shared<TrieNode>();
+  }
+  Trie new_trie(cur);
+  int len = static_cast<int>(key.size());
+  for (int i = 0; i < len; i++) {
     auto c = key[i];
-    path.emplace_back(cur);
-    if (!cur->children_.at(c)) {
-      break;
+    if (!cur->children_[c]) {
+      // 如果子节点不存在
+      std::shared_ptr<TrieNode> tmp = std::make_shared<TrieNode>();
+      if (i - key.length() + 1 == 0) {
+        tmp = std::make_shared<TrieNodeWithValue<T>>(std::make_shared<T>(std::move(value)));
+      }
+      cur->children_[c] = tmp;
+      cur = tmp;
+      continue;
     }
-    cur = cur->children_.at(c);  // 不能使用[]的原因是，[]没有const保证
+    // 如果子节点存在
+    std::shared_ptr<TrieNode> tmp = cur->children_[c]->Clone();
+    if (i - key.length() + 1 == 0) {
+      tmp = std::make_shared<TrieNodeWithValue<T>>(tmp->children_, std::make_shared<T>(std::move(value)));
+    }
+    cur->children_[c] = tmp;
+    cur = tmp;
   }
-
-  // create new path
-  std::shared_ptr<T> v = std::make_shared<T>(std::move(value));
-  std::shared_ptr<TrieNode> new_node = std::make_shared<TrieNodeWithValue<T>>(v);
-  for (int j = key.length() - 1; j > i; j--) {
-    auto tmp = std::make_shared<TrieNode>();
-    tmp->children_[key[j]] = new_node;
-    new_node = tmp;
-  }
-  std::shared_ptr<TrieNode> new_cur = this->root_->Clone();
-  Trie new_trie(new_cur);
-  for (int j = 0; j < i; j++) {
-    auto c = key[j];
-    std::shared_ptr<TrieNode> tmp = new_cur->children_[c]->Clone();
-    new_cur->children_[c] = tmp;
-    new_cur = tmp;
-  }
-
-  new_cur->children_[key[i]] = new_node;
-
   return new_trie;
 }
 
