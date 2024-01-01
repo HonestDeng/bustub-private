@@ -30,10 +30,28 @@ class LRUKNode {
   /** History of last seen K timestamps of this page. Least recent timestamp stored in front. */
   // Remove maybe_unused if you start using them. Feel free to change the member variables as you want.
 
-  [[maybe_unused]] std::list<size_t> history_;
+  std::vector<size_t> history_;
   [[maybe_unused]] size_t k_;
-  [[maybe_unused]] frame_id_t fid_;
-  [[maybe_unused]] bool is_evictable_{false};
+
+ public:
+  frame_id_t fid_;
+  bool is_evictable_{false};
+
+  LRUKNode(const frame_id_t fid, const size_t k) : k_(k), fid_(fid) {}
+
+  size_t k_dist(const size_t timestamp) const {
+    if (history_.size() < k_) {
+      return +LONG_MAX;
+    }
+    return timestamp - history_[history_.size() - k_];
+  }
+  // should never return -1
+  size_t least_recent() const { return history_.empty() ? -1 : history_.back(); }
+
+  // record a new access
+  void record(const size_t timestamp) {
+    history_.emplace_back(timestamp);
+  }
 };
 
 /**
@@ -153,7 +171,8 @@ class LRUKReplacer {
   [[maybe_unused]] std::unordered_map<frame_id_t, LRUKNode> node_store_;
   [[maybe_unused]] size_t current_timestamp_{0};
   [[maybe_unused]] size_t curr_size_{0};
-  [[maybe_unused]] size_t replacer_size_;
+  [[maybe_unused]] size_t
+      replacer_size_;  // 这两者有什么区别 我的理解是，replacer_size_是node_store的大小，curr_size_是evictable的大小
   [[maybe_unused]] size_t k_;
   [[maybe_unused]] std::mutex latch_;
 };
