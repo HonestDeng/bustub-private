@@ -46,7 +46,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
   }
   *frame_id = target;
   curr_size_--;
-//  replacer_size_--;
+  //  replacer_size_--;
   node_store_.erase(target);
   return true;
 }
@@ -69,10 +69,10 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, AccessType access_type) {
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   current_timestamp_++;
   const auto node = node_store_.at(frame_id);
-  if(node.is_evictable_ && !set_evictable) {
+  if (node.is_evictable_ && !set_evictable) {
     // 如果旧值是true吗，新值是false，那么curr_size--
     curr_size_--;
-  }else if(!node.is_evictable_ && set_evictable) {
+  } else if (!node.is_evictable_ && set_evictable) {
     curr_size_++;
   }
   node_store_.at(frame_id).is_evictable_ = set_evictable;
@@ -80,17 +80,15 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
 
 void LRUKReplacer::Remove(frame_id_t frame_id) {
   current_timestamp_++;
-  if(node_store_.count(frame_id) == 0) {
+  if (node_store_.count(frame_id) == 0) {
     return;
   }
   BUSTUB_ASSERT(node_store_.at(frame_id).is_evictable_, "remove an non-evictable frame");
   node_store_.erase(frame_id);
-//  replacer_size_--;
+  //  replacer_size_--;
   curr_size_--;
 }
 
-auto LRUKReplacer::Size() -> size_t {
-  return curr_size_;
-}
+auto LRUKReplacer::Size() -> size_t { return curr_size_; }
 
 }  // namespace bustub

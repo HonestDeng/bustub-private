@@ -22,9 +22,9 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager
                                      LogManager *log_manager)
     : pool_size_(pool_size), disk_scheduler_(std::make_unique<DiskScheduler>(disk_manager)), log_manager_(log_manager) {
   // TODO(students): remove this line after you have implemented the buffer pool manager
-  throw NotImplementedException(
-      "BufferPoolManager is not implemented yet. If you have finished implementing BPM, please remove the throw "
-      "exception line in `buffer_pool_manager.cpp`.");
+  //  throw NotImplementedException(
+  //      "BufferPoolManager is not implemented yet. If you have finished implementing BPM, please remove the throw "
+  //      "exception line in `buffer_pool_manager.cpp`.");
 
   // we allocate a consecutive memory space for the buffer pool
   pages_ = new Page[pool_size_];
@@ -38,30 +38,194 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager
 
 BufferPoolManager::~BufferPoolManager() { delete[] pages_; }
 
-auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * { return nullptr; }
+auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
+  // 如果free_list中有空闲的frame
+  Page *ret = nullptr;
+  if (!free_list_.empty()) {
+    auto frame_id = free_list_.front();
+    free_list_.pop_front();
+    *page_id = AllocatePage();
+    pages_[frame_id].page_id_ = *page_id;
+    // 记录page存放在哪一个frame中
+    page_table_[*page_id] = frame_id;
+
+    ret = pages_ + frame_id;
+  } else if (replacer_->Size() != 0) {
+    // 如果bufferpool中有evictable，那么就将这个evitable页写回内存
+    // 然后将腾出来的frame放新的page
+    // 腾出空间
+    frame_id_t frame_id;
+    replacer_->Evict(&frame_id);
+    BUSTUB_ASSERT(pages_[frame_id].pin_count_ == 0, "pin_count not equal 0");
+    // 如果page被修改过，则写回到磁盘中
+    if (pages_[frame_id].is_dirty_ && pages_[frame_id].pin_count_ == 0) {
+      // 因为这是evictable的，pin_count应该等于0
+      FlushPage(pages_[frame_id].page_id_);
+    }
+
+    // allocate new page
+    *page_id = AllocatePage();
+    pages_[frame_id].page_id_ = *page_id;
+    page_table_[*page_id] = frame_id;
+
+    ret = pages_ + frame_id;
+  }
+  if (ret != nullptr) {
+    // reset memory and metadata
+    ret->ResetMemory();
+    ret->pin_count_ = 0;
+    ret->is_dirty_ = false;
+    page_table_.erase(*page_id);
+    // set the replacer
+    replacer_->SetEvictable(page_table_[*page_id], false);
+    replacer_->RecordAccess(page_table_[*page_id]);
+  }
+  // 没有空余的frame可以存放page了
+  return ret;
+}
 
 auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType access_type) -> Page * {
-  return nullptr;
+  // if the page requested in the pool
+  if (page_table_.count(page_id) > 0) {
+    auto frame_id = page_table_[page_id];
+    return pages_ + page_id;
+  }
+
+  Page *ret = nullptr;
+  // if there is a free frame
+  if (!free_list_.empty()) {
+    auto frame_id = free_list_.front();
+    free_list_.pop_front();
+    ret = pages_ + frame_id;
+    ret->page_id_ = page_id;
+    // 记录page存放在哪一个frame中
+    page_table_[page_id] = frame_id;
+
+    // 从磁盘读取数据
+    auto promise1 = disk_scheduler_->CreatePromise();
+    auto future1 = promise1.get_future();
+    disk_scheduler_->Schedule({/*is_write=*/false, ret->GetData(), /*page_id=*/page_id, std::move(promise1)});
+    // if fail to read
+    BUSTUB_ASSERT(future1.get() == true, "fail to read page");
+  } else if (replacer_->Size() > 0) {  // if there is a evictable page
+    // 腾出空间
+    frame_id_t frame_id;
+    replacer_->Evict(&frame_id);
+    ret = pages_ + frame_id;
+    page_table_[page_id] = frame_id;
+    BUSTUB_ASSERT(pages_[frame_id].pin_count_ == 0, "pin_count not equal 0");
+    // 如果page被修改过，则写回到磁盘中
+    if (ret->is_dirty_ && ret->pin_count_ == 0) {
+      // 因为这是evictable的，pin_count应该等于0
+      FlushPage(ret->page_id_);
+    }
+    // 从磁盘读取数据
+    auto promise1 = disk_scheduler_->CreatePromise();
+    auto future1 = promise1.get_future();
+    disk_scheduler_->Schedule({/*is_write=*/false, ret->GetData(), /*page_id=*/page_id, std::move(promise1)});
+    // if fail to read
+    BUSTUB_ASSERT(future1.get() == true, "fail to read page");
+  }
+
+  if (ret != nullptr) {
+    // reset memory and metadata
+    ret->pin_count_ = 0;
+    ret->is_dirty_ = false;
+    page_table_.erase(page_id);
+    // set the replacer
+    replacer_->SetEvictable(page_table_[page_id], false);
+    replacer_->RecordAccess(page_table_[page_id]);
+  }
+
+  return ret;
 }
 
 auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unused]] AccessType access_type) -> bool {
-  return false;
+  // page not in the pool
+  if (page_table_.count(page_id) == 0) {
+    return false;
+  }
+
+  Page *page = pages_ + page_table_[page_id];
+  // pin_count is already 0
+  if (page->pin_count_ == 0) {
+    return false;
+  }
+
+  page->pin_count_--;
+  if (page->pin_count_ == 0) {
+    // set the page evictable
+    replacer_->SetEvictable(page_table_[page_id], true);
+  }
+  page->is_dirty_ = is_dirty || page->is_dirty_;
+  return true;
 }
 
-auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool { return false; }
+auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
+  if (page_table_.count(page_id) == 0) {
+    return false;
+  }
+  frame_id_t frame_id = page_table_[page_id];
+  Page *page = pages_ + frame_id;
 
-void BufferPoolManager::FlushAllPages() {}
+  // 将数据写入磁盘
+  auto promise1 = disk_scheduler_->CreatePromise();
+  auto future1 = promise1.get_future();
+  disk_scheduler_->Schedule({/*is_write=*/true, page->GetData(), /*page_id=*/page_id, std::move(promise1)});
+  // if fail to read
+  BUSTUB_ASSERT(future1.get() == true, "fail to read page");
 
-auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool { return false; }
+  // clean meta data
+  page->is_dirty_ = false;
+  return true;
+}
+
+void BufferPoolManager::FlushAllPages() {
+  for (const auto &item : page_table_) {
+    auto &page_id = item.first;
+    auto &frame_id = item.second;
+    FlushPage(page_id);
+  }
+}
+
+auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
+  // the page not in the pool
+  if (page_table_.count(page_id) == 0) {
+    return true;
+  }
+  Page *page = pages_ + page_table_[page_id];
+  // the page is pinned
+  if (page->pin_count_ > 0) {
+    return false;
+  }
+
+  // now the page can be deleted
+  DeletePage(page_id);
+  // reset metadata
+  frame_id_t frame_id = page_table_[page_id];
+  replacer_->Remove(frame_id);
+  page_table_.erase(page_id);
+  free_list_.push_front(frame_id);
+
+  return true;
+}
 
 auto BufferPoolManager::AllocatePage() -> page_id_t { return next_page_id_++; }
 
-auto BufferPoolManager::FetchPageBasic(page_id_t page_id) -> BasicPageGuard { return {this, nullptr}; }
+auto BufferPoolManager::FetchPageBasic(page_id_t page_id) -> BasicPageGuard { return {this, FetchPage(page_id)}; }
 
-auto BufferPoolManager::FetchPageRead(page_id_t page_id) -> ReadPageGuard { return {this, nullptr}; }
+auto BufferPoolManager::FetchPageRead(page_id_t page_id) -> ReadPageGuard {
+  auto ret = FetchPage(page_id);
+  ret->RLatch();
+  return {this, ret};
+}
 
-auto BufferPoolManager::FetchPageWrite(page_id_t page_id) -> WritePageGuard { return {this, nullptr}; }
+auto BufferPoolManager::FetchPageWrite(page_id_t page_id) -> WritePageGuard {
+  auto ret = FetchPage(page_id);
+  ret->WLatch();
+  return {this, ret};
+}
 
-auto BufferPoolManager::NewPageGuarded(page_id_t *page_id) -> BasicPageGuard { return {this, nullptr}; }
+auto BufferPoolManager::NewPageGuarded(page_id_t *page_id) -> BasicPageGuard { return {this, NewPage(page_id)}; }
 
 }  // namespace bustub
