@@ -39,6 +39,7 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager
 BufferPoolManager::~BufferPoolManager() { delete[] pages_; }
 
 auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
+  latch_.lock();
   // 如果free_list中有空闲的frame
   Page *ret = nullptr;
   if (!free_list_.empty()) {
@@ -60,8 +61,11 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
     // 如果page被修改过，则写回到磁盘中
     if (pages_[frame_id].is_dirty_ && pages_[frame_id].pin_count_ == 0) {
       // 因为这是evictable的，pin_count应该等于0
+      latch_.unlock();
       FlushPage(pages_[frame_id].page_id_);
+      latch_.lock();
     }
+    page_table_.erase(pages_[frame_id].page_id_); // 删除原本的映射
 
     // allocate new page
     *page_id = AllocatePage();
@@ -73,22 +77,26 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
   if (ret != nullptr) {
     // reset memory and metadata
     ret->ResetMemory();
-    ret->pin_count_ = 0;
+    ret->pin_count_ = 1;  // the current thread pin this page initially
     ret->is_dirty_ = false;
-    page_table_.erase(*page_id);
+    ret->page_id_ = *page_id;
     // set the replacer
+    replacer_->RecordAccess(page_table_[*page_id]);  // 先记录访问，然后再设置non-evictable
     replacer_->SetEvictable(page_table_[*page_id], false);
-    replacer_->RecordAccess(page_table_[*page_id]);
   }
+  latch_.unlock();
   // 没有空余的frame可以存放page了
   return ret;
 }
 
 auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType access_type) -> Page * {
+  latch_.lock();
   // if the page requested in the pool
   if (page_table_.count(page_id) > 0) {
     auto frame_id = page_table_[page_id];
-    return pages_ + page_id;
+    replacer_->RecordAccess(frame_id);  // 记录访问
+    latch_.unlock();
+    return pages_ + frame_id;
   }
 
   Page *ret = nullptr;
@@ -117,8 +125,12 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     // 如果page被修改过，则写回到磁盘中
     if (ret->is_dirty_ && ret->pin_count_ == 0) {
       // 因为这是evictable的，pin_count应该等于0
+      latch_.unlock();
       FlushPage(ret->page_id_);
+      latch_.lock();
     }
+    page_table_.erase(pages_[frame_id].page_id_);  // 删除原本的映射
+
     // 从磁盘读取数据
     auto promise1 = disk_scheduler_->CreatePromise();
     auto future1 = promise1.get_future();
@@ -129,26 +141,30 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
 
   if (ret != nullptr) {
     // reset memory and metadata
-    ret->pin_count_ = 0;
+    ret->pin_count_ = 1;
     ret->is_dirty_ = false;
-    page_table_.erase(page_id);
+    ret->page_id_ = page_id;
     // set the replacer
-    replacer_->SetEvictable(page_table_[page_id], false);
     replacer_->RecordAccess(page_table_[page_id]);
+    replacer_->SetEvictable(page_table_[page_id], false);
   }
 
+  latch_.unlock();
   return ret;
 }
 
 auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unused]] AccessType access_type) -> bool {
+  latch_.lock();
   // page not in the pool
   if (page_table_.count(page_id) == 0) {
+    latch_.unlock();
     return false;
   }
 
   Page *page = pages_ + page_table_[page_id];
   // pin_count is already 0
   if (page->pin_count_ == 0) {
+    latch_.unlock();
     return false;
   }
 
@@ -158,11 +174,14 @@ auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unus
     replacer_->SetEvictable(page_table_[page_id], true);
   }
   page->is_dirty_ = is_dirty || page->is_dirty_;
+  latch_.unlock();
   return true;
 }
 
 auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
+  latch_.lock();
   if (page_table_.count(page_id) == 0) {
+    latch_.unlock();
     return false;
   }
   frame_id_t frame_id = page_table_[page_id];
@@ -177,18 +196,22 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
 
   // clean meta data
   page->is_dirty_ = false;
+
+  latch_.unlock();
   return true;
 }
 
 void BufferPoolManager::FlushAllPages() {
+  latch_.lock();
   for (const auto &item : page_table_) {
     auto &page_id = item.first;
-    auto &frame_id = item.second;
     FlushPage(page_id);
   }
+  latch_.unlock();
 }
 
 auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
+  latch_.lock();
   // the page not in the pool
   if (page_table_.count(page_id) == 0) {
     return true;
@@ -196,21 +219,25 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
   Page *page = pages_ + page_table_[page_id];
   // the page is pinned
   if (page->pin_count_ > 0) {
+    latch_.unlock();
     return false;
   }
 
   // now the page can be deleted
-  DeletePage(page_id);
+  DeallocatePage(page_id);
   // reset metadata
   frame_id_t frame_id = page_table_[page_id];
   replacer_->Remove(frame_id);
   page_table_.erase(page_id);
   free_list_.push_front(frame_id);
 
+  latch_.unlock();
   return true;
 }
 
-auto BufferPoolManager::AllocatePage() -> page_id_t { return next_page_id_++; }
+auto BufferPoolManager::AllocatePage() -> page_id_t {
+  return next_page_id_++;
+}
 
 auto BufferPoolManager::FetchPageBasic(page_id_t page_id) -> BasicPageGuard { return {this, FetchPage(page_id)}; }
 
