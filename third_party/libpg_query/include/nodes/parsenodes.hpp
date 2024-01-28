@@ -823,7 +823,7 @@ typedef struct PGRangeTblFunction {
 
 	PGNode *funcexpr; /* expression tree for func call */
 	int funccolcount; /* number of columns it contributes to RTE */
-	/* These fields record the contents of a column definition list, if any: */
+	/* These fields Record the contents of a column definition list, if any: */
 	PGList *funccolnames;      /* column names (list of String) */
 	PGList *funccoltypes;      /* OID list of column type OIDs */
 	PGList *funccoltypmods;    /* integer list of column typmods */

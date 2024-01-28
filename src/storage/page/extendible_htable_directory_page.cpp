@@ -20,46 +20,59 @@
 
 namespace bustub {
 
-void ExtendibleHTableDirectoryPage::Init(uint32_t max_depth) {
-  throw NotImplementedException("ExtendibleHTableDirectoryPage is not implemented");
+void ExtendibleHTableDirectoryPage::Init(uint32_t max_depth) { this->max_depth_ = max_depth; }
+
+auto ExtendibleHTableDirectoryPage::HashToBucketIndex(uint32_t hash) const -> uint32_t {
+  auto index = hash & ~(0xffffffff << global_depth_);
+  return index;
 }
 
-auto ExtendibleHTableDirectoryPage::HashToBucketIndex(uint32_t hash) const -> uint32_t { return 0; }
-
-auto ExtendibleHTableDirectoryPage::GetBucketPageId(uint32_t bucket_idx) const -> page_id_t { return INVALID_PAGE_ID; }
+auto ExtendibleHTableDirectoryPage::GetBucketPageId(uint32_t bucket_idx) const -> page_id_t {
+  return bucket_page_ids_[bucket_idx];
+}
 
 void ExtendibleHTableDirectoryPage::SetBucketPageId(uint32_t bucket_idx, page_id_t bucket_page_id) {
-  throw NotImplementedException("ExtendibleHTableDirectoryPage is not implemented");
+  bucket_page_ids_[bucket_idx] = bucket_page_id;
 }
 
-auto ExtendibleHTableDirectoryPage::GetSplitImageIndex(uint32_t bucket_idx) const -> uint32_t { return 0; }
+auto ExtendibleHTableDirectoryPage::GetSplitImageIndex(uint32_t bucket_idx) const -> uint32_t {
+  return bucket_idx ^ (1 << (global_depth_ - 1));  // 001的split image是101
+}
 
-auto ExtendibleHTableDirectoryPage::GetGlobalDepth() const -> uint32_t { return 0; }
+auto ExtendibleHTableDirectoryPage::GetGlobalDepth() const -> uint32_t { return global_depth_; }
 
 void ExtendibleHTableDirectoryPage::IncrGlobalDepth() {
-  throw NotImplementedException("ExtendibleHTableDirectoryPage is not implemented");
+  int offset = 1 << global_depth_;
+  // memcpy拷贝的单位是字节(byte)，因此拷贝的长度是需要拷贝的单个item的大小*item的个数
+  std::memcpy(bucket_page_ids_ + offset, bucket_page_ids_, offset * sizeof(bucket_page_ids_[0]));
+  std::memcpy(local_depths_ + offset, local_depths_, offset * sizeof(local_depths_[0]));
+  global_depth_++;
 }
 
-void ExtendibleHTableDirectoryPage::DecrGlobalDepth() {
-  throw NotImplementedException("ExtendibleHTableDirectoryPage is not implemented");
+void ExtendibleHTableDirectoryPage::DecrGlobalDepth() { global_depth_--; }
+
+auto ExtendibleHTableDirectoryPage::CanShrink() -> bool {
+  uint32_t len = (1 << global_depth_);
+  for (uint32_t i = 0; i < len; i++) {
+    if (local_depths_[i] >= global_depth_) {
+      return false;
+    }
+  }
+  return true;
 }
 
-auto ExtendibleHTableDirectoryPage::CanShrink() -> bool { return false; }
+auto ExtendibleHTableDirectoryPage::Size() const -> uint32_t { return (1 << global_depth_); }
 
-auto ExtendibleHTableDirectoryPage::Size() const -> uint32_t { return 0; }
-
-auto ExtendibleHTableDirectoryPage::GetLocalDepth(uint32_t bucket_idx) const -> uint32_t { return 0; }
+auto ExtendibleHTableDirectoryPage::GetLocalDepth(uint32_t bucket_idx) const -> uint32_t {
+  return local_depths_[bucket_idx];
+}
 
 void ExtendibleHTableDirectoryPage::SetLocalDepth(uint32_t bucket_idx, uint8_t local_depth) {
-  throw NotImplementedException("ExtendibleHTableDirectoryPage is not implemented");
+  local_depths_[bucket_idx] = local_depth;
 }
 
-void ExtendibleHTableDirectoryPage::IncrLocalDepth(uint32_t bucket_idx) {
-  throw NotImplementedException("ExtendibleHTableDirectoryPage is not implemented");
-}
+void ExtendibleHTableDirectoryPage::IncrLocalDepth(uint32_t bucket_idx) { local_depths_[bucket_idx]++; }
 
-void ExtendibleHTableDirectoryPage::DecrLocalDepth(uint32_t bucket_idx) {
-  throw NotImplementedException("ExtendibleHTableDirectoryPage is not implemented");
-}
+void ExtendibleHTableDirectoryPage::DecrLocalDepth(uint32_t bucket_idx) { local_depths_[bucket_idx]--; }
 
 }  // namespace bustub

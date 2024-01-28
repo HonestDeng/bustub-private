@@ -310,7 +310,7 @@ static utf8proc_bool grapheme_break_extended(int lbc, int tbc, utf8proc_int32_t 
       if (tbc == UTF8PROC_BOUNDCLASS_EXTEND) // fold EXTEND codepoints into emoji
         *state = UTF8PROC_BOUNDCLASS_EXTENDED_PICTOGRAPHIC;
       else if (tbc == UTF8PROC_BOUNDCLASS_ZWJ)
-        *state = UTF8PROC_BOUNDCLASS_E_ZWG; // state to record emoji+zwg combo
+        *state = UTF8PROC_BOUNDCLASS_E_ZWG; // state to Record emoji+zwg combo
       else
         *state = tbc;
     }

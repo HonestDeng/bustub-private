@@ -64,7 +64,7 @@ class BufferPoolManager {
    *
    * Remember to "Pin" the frame by calling replacer.SetEvictable(frame_id, false)
    * so that the replacer wouldn't evict the frame before the buffer pool manager "Unpin"s it.
-   * Also, remember to record the access history of the frame in the replacer for the lru-k algorithm to work.
+   * Also, remember to Record the access history of the frame in the replacer for the lru-k algorithm to work.
    *
    * @param[out] page_id id of created page
    * @return nullptr if no new pages could be created, otherwise pointer to new page
@@ -96,7 +96,7 @@ class BufferPoolManager {
    * disk_scheduler_->Schedule(), and replace the old page in the frame. Similar to NewPage(), if the old page is dirty,
    * you need to write it back to disk and update the metadata of the new page
    *
-   * In addition, remember to disable eviction and record the access history of the frame like you did for NewPage().
+   * In addition, remember to disable eviction and Record the access history of the frame like you did for NewPage().
    *
    * @param page_id id of page to be fetched
    * @param access_type type of access to the page, only needed for leaderboard tests.

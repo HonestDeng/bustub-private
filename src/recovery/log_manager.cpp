@@ -32,7 +32,7 @@ void LogManager::StopFlushThread() {}
 /*
  * append a log record into log buffer
  * you MUST set the log record's lsn within this method
- * @return: lsn that is assigned to this log record
+ * @return: lsn that is assigned to this log Record
  *
  *
  * example below

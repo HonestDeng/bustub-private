@@ -2152,7 +2152,7 @@ Things to note:
 *   The `timestamp` attribute records the local date and time of the test
     execution.
 
-*   The `file` and `line` attributes record the source file location, where the
+*   The `file` and `line` attributes Record the source file location, where the
     test was defined.
 
 *   Each `<failure>` element corresponds to a single failed GoogleTest

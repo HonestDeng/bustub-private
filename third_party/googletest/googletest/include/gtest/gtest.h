@@ -1863,7 +1863,7 @@ class TestWithParam : public Test, public WithParamInterface<T> {};
 //   EXPECT_NE(Foo(), 5);
 //   EXPECT_EQ(a_pointer, NULL);
 //   ASSERT_LT(i, array_size);
-//   ASSERT_GT(records.size(), 0) << "There is no record left.";
+//   ASSERT_GT(records.size(), 0) << "There is no Record left.";
 
 #define EXPECT_EQ(val1, val2) \
   EXPECT_PRED_FORMAT2(::testing::internal::EqHelper::Compare, val1, val2)

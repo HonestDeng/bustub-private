@@ -51,7 +51,7 @@ class TableIterator {
   TableHeap *table_heap_;
   RID rid_;
 
-  // When creating table iterator, we will record the maximum RID that we should scan.
+  // When creating table iterator, we will Record the maximum RID that we should scan.
   // Otherwise we will have dead loops when updating while scanning. (In project 4, update should be implemented as
   // deletion + insertion.)
   RID stop_at_rid_;

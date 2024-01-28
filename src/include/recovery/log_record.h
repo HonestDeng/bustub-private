@@ -19,7 +19,7 @@
 #include "storage/table/tuple.h"
 
 namespace bustub {
-/** The type of the log record. */
+/** The type of the log Record. */
 enum class LogRecordType {
   INVALID = 0,
   INSERT,
@@ -35,13 +35,13 @@ enum class LogRecordType {
 };
 
 /**
- * For every write operation on the table page, you should write ahead a corresponding log record.
+ * For every write operation on the table page, you should write ahead a corresponding log Record.
  *
- * For EACH log record, HEADER is like (5 fields in common, 20 bytes in total).
+ * For EACH log Record, HEADER is like (5 fields in common, 20 bytes in total).
  *---------------------------------------------
  * | size | LSN | transID | prevLSN | LogType |
  *---------------------------------------------
- * For insert type log record
+ * For insert type log Record
  *---------------------------------------------------------------
  * | HEADER | tuple_rid | tuple_size | tuple_data(char[] array) |
  *---------------------------------------------------------------
@@ -49,11 +49,11 @@ enum class LogRecordType {
  *----------------------------------------------------------------
  * | HEADER | tuple_rid | tuple_size | tuple_data(char[] array) |
  *---------------------------------------------------------------
- * For update type log record
+ * For update type log Record
  *-----------------------------------------------------------------------------------
  * | HEADER | tuple_rid | tuple_size | old_tuple_data | tuple_size | new_tuple_data |
  *-----------------------------------------------------------------------------------
- * For new page type log record
+ * For new page type log Record
  *--------------------------
  * | HEADER | prev_page_id |
  *--------------------------
@@ -81,7 +81,7 @@ class LogRecord {
       delete_rid_ = rid;
       delete_tuple_ = tuple;
     }
-    // calculate log record size
+    // calculate log Record size
     size_ = HEADER_SIZE + sizeof(RID) + sizeof(int32_t) + tuple.GetLength();
   }
 
@@ -94,7 +94,7 @@ class LogRecord {
         update_rid_(update_rid),
         old_tuple_(old_tuple),
         new_tuple_(new_tuple) {
-    // calculate log record size
+    // calculate log Record size
     size_ = HEADER_SIZE + sizeof(RID) + old_tuple.GetLength() + new_tuple.GetLength() + 2 * sizeof(int32_t);
   }
 
@@ -106,7 +106,7 @@ class LogRecord {
         log_record_type_(log_record_type),
         prev_page_id_(prev_page_id),
         page_id_(page_id) {
-    // calculate log record size, header size + sizeof(prev_page_id) + sizeof(page_id)
+    // calculate log Record size, header size + sizeof(prev_page_id) + sizeof(page_id)
     size_ = HEADER_SIZE + sizeof(page_id_t) * 2;
   }
 
@@ -152,7 +152,7 @@ class LogRecord {
   }
 
  private:
-  // the length of log record(for serialization, in bytes)
+  // the length of log Record(for serialization, in bytes)
   int32_t size_{0};
   // must have fields
   lsn_t lsn_{INVALID_LSN};

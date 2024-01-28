@@ -39,17 +39,17 @@ class LRUKNode {
 
   LRUKNode(const frame_id_t fid, const size_t k) : k_(k), fid_(fid) {}
 
-  size_t k_dist(const size_t timestamp) const {
+  auto KDist(const size_t timestamp) const -> size_t {
     if (history_.size() < k_) {
       return +LONG_MAX;
     }
     return timestamp - history_[history_.size() - k_];
   }
   // should never return -1
-  size_t least_recent() const { return history_.empty() ? -1 : history_.back(); }
+  auto LeastRecent() const -> size_t { return history_.empty() ? -1 : history_.back(); }
 
-  // record a new access
-  void record(const size_t timestamp) { history_.emplace_back(timestamp); }
+  // Record a new access
+  void Record(const size_t timestamp) { history_.emplace_back(timestamp); }
 };
 
 /**

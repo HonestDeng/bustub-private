@@ -16,7 +16,7 @@ TEST(TxnScanTest, DISABLED_TupleReconstructTest) {  // NOLINT
     VerifyTuple(schema.get(), *tuple, {Int(0), Double(1), BoolNull()});
   }
   {
-    fmt::println(stderr, "B: deleted base tuple + reconstruct 1 record");
+    fmt::println(stderr, "B: deleted base tuple + reconstruct 1 Record");
     auto base_tuple = Tuple{{IntNull(), DoubleNull(), BoolNull()}, schema.get()};
     auto base_meta = TupleMeta{2333, true};
     {
@@ -26,7 +26,7 @@ TEST(TxnScanTest, DISABLED_TupleReconstructTest) {  // NOLINT
     }
     auto undo_log_1 = UndoLog{false, {true, true, true}, Tuple{{Int(1), Double(2), Bool(false)}, schema.get()}};
     {
-      fmt::println(stderr, "B2: verify 1st record");
+      fmt::println(stderr, "B2: verify 1st Record");
       auto tuple = ReconstructTuple(schema.get(), base_tuple, base_meta, {undo_log_1});
       ASSERT_TRUE(tuple.has_value());
       VerifyTuple(schema.get(), *tuple, {Int(1), Double(2), Bool(false)});
@@ -44,25 +44,25 @@ TEST(TxnScanTest, DISABLED_TupleReconstructTest) {  // NOLINT
     auto undo_log_3 = UndoLog{false, {true, false, true}, Tuple{{Int(3), Bool(false)}, undo_log_3_schema.get()}};
     auto undo_log_4 = UndoLog{false, {true, true, true}, Tuple{{Int(4), Double(4), Bool(true)}, schema.get()}};
     {
-      fmt::println(stderr, "C1: verify 1st record");
+      fmt::println(stderr, "C1: verify 1st Record");
       auto tuple = ReconstructTuple(schema.get(), base_tuple, base_meta, {undo_log_1});
       ASSERT_TRUE(tuple.has_value());
       VerifyTuple(schema.get(), *tuple, {Int(0), Double(1), BoolNull()});
     }
     {
-      fmt::println(stderr, "C2: verify 2nd record");
+      fmt::println(stderr, "C2: verify 2nd Record");
       auto tuple = ReconstructTuple(schema.get(), base_tuple, base_meta, {undo_log_1, undo_log_2});
       ASSERT_TRUE(tuple.has_value());
       VerifyTuple(schema.get(), *tuple, {Int(0), Double(2), BoolNull()});
     }
     {
-      fmt::println(stderr, "C3: verify 3rd record");
+      fmt::println(stderr, "C3: verify 3rd Record");
       auto tuple = ReconstructTuple(schema.get(), base_tuple, base_meta, {undo_log_1, undo_log_2, undo_log_3});
       ASSERT_TRUE(tuple.has_value());
       VerifyTuple(schema.get(), *tuple, {Int(3), Double(2), Bool(false)});
     }
     {
-      fmt::println(stderr, "C4: verify 4th record");
+      fmt::println(stderr, "C4: verify 4th Record");
       auto tuple =
           ReconstructTuple(schema.get(), base_tuple, base_meta, {undo_log_1, undo_log_2, undo_log_3, undo_log_4});
       ASSERT_TRUE(tuple.has_value());
@@ -78,23 +78,23 @@ TEST(TxnScanTest, DISABLED_TupleReconstructTest) {  // NOLINT
     auto undo_log_1 = UndoLog{false, {true, true, true}, Tuple{{Int(1), Double(1), Bool(false)}, schema.get()}};
     auto undo_log_2 = UndoLog{false, {true, true, true}, Tuple{{IntNull(), DoubleNull(), BoolNull()}, schema.get()}};
     {
-      fmt::println(stderr, "D1: apply delete record");
+      fmt::println(stderr, "D1: apply delete Record");
       auto tuple = ReconstructTuple(schema.get(), base_tuple, base_meta, {delete_log});
       ASSERT_FALSE(tuple.has_value());
     }
     {
-      fmt::println(stderr, "D2: verify 2nd record");
+      fmt::println(stderr, "D2: verify 2nd Record");
       auto tuple = ReconstructTuple(schema.get(), base_tuple, base_meta, {delete_log, undo_log_1});
       ASSERT_TRUE(tuple.has_value());
       VerifyTuple(schema.get(), *tuple, {Int(1), Double(1), Bool(false)});
     }
     {
-      fmt::println(stderr, "D3: apply delete record");
+      fmt::println(stderr, "D3: apply delete Record");
       auto tuple = ReconstructTuple(schema.get(), base_tuple, base_meta, {delete_log, undo_log_1, delete_log});
       ASSERT_FALSE(tuple.has_value());
     }
     {
-      fmt::println(stderr, "D4: verify 4th record");
+      fmt::println(stderr, "D4: verify 4th Record");
       auto tuple =
           ReconstructTuple(schema.get(), base_tuple, base_meta, {delete_log, undo_log_1, delete_log, undo_log_2});
       ASSERT_TRUE(tuple.has_value());

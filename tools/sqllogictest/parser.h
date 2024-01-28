@@ -33,7 +33,7 @@ class Location {
 };
 
 enum class RecordType : uint8_t {
-  INVALID = 0,   /**< Invalid record. */
+  INVALID = 0,   /**< Invalid Record. */
   INCLUDE = 1,   /**< Include */
   STATEMENT = 3, /**< Statement */
   SLEEP = 4,     /**< Sleep */

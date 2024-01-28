@@ -79,7 +79,7 @@ class TableHeap {
    */
   auto GetTupleMeta(RID rid) -> TupleMeta;
 
-  /** @return the iterator of this table. When this iterator is created, it will record the current last tuple in the
+  /** @return the iterator of this table. When this iterator is created, it will Record the current last tuple in the
    * table heap, and the iterator will stop at that point, in order to avoid halloween problem. You usually will need to
    * use this function for project 3. Given that you have already implemented your project 4 update executor as a
    * pipeline breaker, you may use `MakeEagerIterator` to test whether the update executor is implemented correctly.

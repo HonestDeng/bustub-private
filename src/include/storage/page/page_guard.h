@@ -66,7 +66,7 @@ class BasicPageGuard {
    * @brief Upgrade a BasicPageGuard to a ReadPageGuard
    *
    * The protected page is not evicted from the buffer pool during the upgrade,
-   * and the basic page guard should be made invalid after calling this function.
+   * and the basic page guard should be made invalid after calling this function.  无效是什么意思？
    *
    * @return an upgraded ReadPageGuard
    */

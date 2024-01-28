@@ -65,7 +65,7 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
       FlushPage(pages_[frame_id].page_id_);
       latch_.lock();
     }
-    page_table_.erase(pages_[frame_id].page_id_); // 删除原本的映射
+    page_table_.erase(pages_[frame_id].page_id_);  // 删除原本的映射
 
     // allocate new page
     *page_id = AllocatePage();
@@ -96,6 +96,9 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     auto frame_id = page_table_[page_id];
     replacer_->RecordAccess(frame_id);  // 记录访问
     latch_.unlock();
+    // set the replacer
+    replacer_->RecordAccess(page_table_[page_id]);
+    replacer_->SetEvictable(page_table_[page_id], false);
     return pages_ + frame_id;
   }
 
@@ -235,9 +238,7 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
   return true;
 }
 
-auto BufferPoolManager::AllocatePage() -> page_id_t {
-  return next_page_id_++;
-}
+auto BufferPoolManager::AllocatePage() -> page_id_t { return next_page_id_++; }
 
 auto BufferPoolManager::FetchPageBasic(page_id_t page_id) -> BasicPageGuard { return {this, FetchPage(page_id)}; }
 

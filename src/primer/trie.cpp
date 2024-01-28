@@ -13,7 +13,7 @@ auto Trie::Get(std::string_view key) const -> const T * {
   // nullptr. After you find the node, you should use `dynamic_cast` to cast it to `const TrieNodeWithValue<T> *`. If
   // dynamic_cast returns `nullptr`, it means the type of the value is mismatched, and you should return nullptr.
   // Otherwise, return the value.
-  if(!this->root_){
+  if (!this->root_) {
     // if the root node is nullptr
     return nullptr;
   }
@@ -115,19 +115,19 @@ auto Trie::Remove(std::string_view key) const -> Trie {
   }
   // cur is the end node, and cur not in path
   cur = std::make_shared<TrieNode>(cur->children_);
-  path.back()->children_[key[len-1]] = cur;
+  path.back()->children_[key[len - 1]] = cur;
 
-  for(int i = len - 1; i >= 0; i--){
+  for (int i = len - 1; i >= 0; i--) {
     auto c = key[i];
     auto parent = path.back();
-    if(cur->children_.empty() && !cur->is_value_node_) {
+    if (cur->children_.empty() && !cur->is_value_node_) {
       // 如果cur节点没有儿子并且不带有value，则cur的父亲要跟cur断绝关系
       parent->children_.erase(c);
     }
     cur = parent;
     path.pop_back();
   }
-  if(cur->children_.empty() && !cur->is_value_node_){
+  if (cur->children_.empty() && !cur->is_value_node_) {
     return Trie(nullptr);
   }
 

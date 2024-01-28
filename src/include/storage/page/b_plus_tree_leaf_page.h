@@ -23,7 +23,7 @@ namespace bustub {
 #define LEAF_PAGE_SIZE ((BUSTUB_PAGE_SIZE - LEAF_PAGE_HEADER_SIZE) / sizeof(MappingType))
 
 /**
- * Store indexed key and record id (record id = page id combined with slot id,
+ * Store indexed key and record id (Record id = page id combined with slot id,
  * see `include/common/rid.h` for detailed implementation) together within leaf
  * page. Only support unique key.
  *

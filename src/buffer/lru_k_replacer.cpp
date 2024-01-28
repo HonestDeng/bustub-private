@@ -29,12 +29,12 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
       continue;
     }
     size_t tmp = LONG_MAX;
-    size_t node_k_dist = node.k_dist(current_timestamp_);
+    size_t node_k_dist = node.KDist(current_timestamp_);
     if (k_dist < node_k_dist) {
       k_dist = node_k_dist;
       target = id;
     } else if (k_dist == node_k_dist && node_k_dist == tmp) {
-      if (node.least_recent() < node_store_.at(target).least_recent()) {
+      if (node.LeastRecent() < node_store_.at(target).LeastRecent()) {
         // 当前比较的两个frame都是不够k次访问的，并且node的最近一次访问要比targe早
         target = id;
       }
@@ -58,11 +58,11 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, AccessType access_type) {
 
   if (node_store_.count(frame_id) != 0) {
     // 如果frame已经存在于node_store中了
-    node_store_.at(frame_id).record(current_timestamp_);
+    node_store_.at(frame_id).Record(current_timestamp_);
   } else {
     LRUKNode node(frame_id, k_);
     node_store_.insert(std::make_pair(frame_id, node));
-    node_store_.at(frame_id).record(current_timestamp_);
+    node_store_.at(frame_id).Record(current_timestamp_);
   }
 }
 

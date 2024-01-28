@@ -15,7 +15,7 @@ auto TrieStore::Get(std::string_view key) -> std::optional<ValueGuard<T>> {
   auto trie = root_;
   root_lock_.unlock();
   auto res = trie.Get<T>(key);
-  if(res){
+  if (res) {
     // found the value
     return std::make_optional<ValueGuard<T>>(trie, *res);
   }

@@ -49,9 +49,9 @@ class StringExpression : public AbstractExpression {
     // TODO(student): implement upper / lower.
     std::string res;
     for (const auto &c : val) {
-      if(expr_type_ == StringExpressionType::Lower){
+      if (expr_type_ == StringExpressionType::Lower) {
         res += std::tolower(c);
-      }else{
+      } else {
         res += std::toupper(c);
       }
     }

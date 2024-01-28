@@ -523,7 +523,7 @@ class ParameterizedTestSuiteInfo : public ParameterizedTestSuiteInfoBase {
   }
   // Test suite id to verify identity.
   TypeId GetTestSuiteTypeId() const override { return GetTypeId<TestSuite>(); }
-  // TEST_P macro uses AddTestPattern() to record information
+  // TEST_P macro uses AddTestPattern() to Record information
   // about a single test in a LocalTestInfo structure.
   // test_suite_name is the base name of the test suite (without invocation
   // prefix). test_base_name is the name of an individual test without
@@ -535,7 +535,7 @@ class ParameterizedTestSuiteInfo : public ParameterizedTestSuiteInfoBase {
     tests_.push_back(std::shared_ptr<TestInfo>(new TestInfo(
         test_suite_name, test_base_name, meta_factory, code_location)));
   }
-  // INSTANTIATE_TEST_SUITE_P macro uses AddGenerator() to record information
+  // INSTANTIATE_TEST_SUITE_P macro uses AddGenerator() to Record information
   // about a generator.
   int AddTestSuiteInstantiation(const std::string& instantiation_name,
                                 GeneratorCreationFunc* func,

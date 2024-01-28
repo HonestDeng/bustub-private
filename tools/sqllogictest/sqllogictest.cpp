@@ -329,7 +329,7 @@ auto main(int argc, char **argv) -> int {  // NOLINT
         continue;
       }
       default:
-        throw bustub::Exception("unsupported record");
+        throw bustub::Exception("unsupported Record");
     }
   }
 
