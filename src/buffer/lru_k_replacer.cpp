@@ -18,55 +18,50 @@ namespace bustub {
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_frames), k_(k) {}
 
 auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
-  // 初始化frame_id。如果到最后frame_id还等于-1，说明没有找到可以Evict的帧
-  *frame_id = -1;
-  // 访问次数不足k次的帧
-  std::vector<frame_id_t> inf_node;
   // 遍历每一个节点，寻找一个需要弹出的帧
+  bool found = false;
+  frame_id_t optimal_frame = -1;
+  bool begin = true;
   for (const auto &item : node_store_) {
-    if (item.second.IsEvictable()) {
-      // 如果是
+    if (!item.second.IsEvictable()) {
+      // 这一页不能弹出
       continue;
     }
-    auto &node = item.second;
-    size_t time;
-    if (!node.LeastRecentK(&time)) {
-      // 如果node的访问次数少于k个
-      inf_node.push_back(item.first);
+    // 只要能执行到这里，就说明不所有的frame都被pin了，还存在有frame可以弹出
+    found = true;
+
+    if (begin) {
+      // 在第一次循环初始化optimal_frame
+      optimal_frame = item.first;
+      begin = false;
       continue;
     }
-    if (*frame_id == -1) {
-      *frame_id = item.first;
-      continue;
-    }
-    size_t t1;
-    node_store_.at(*frame_id).LeastRecentK(&t1);
-    if (time < t1) {
-      *frame_id = item.first;
+
+    auto &optimal_node = node_store_.at(optimal_frame);
+    auto &cur_node = node_store_.at(item.first);
+    if (cur_node.IsInf() && optimal_node.IsInf()) {
+      // 如果两个节点都是无穷大，选择最近一次访问最早的淘汰
+      if (cur_node.MostRecent() < optimal_node.MostRecent()) {
+        // 如果cur_node的最近一次访问时间小于optimal_node的，那么说明cur_node的访问时间比optimal_node早
+        optimal_frame = item.first;
+      }
+    } else if (!optimal_node.IsInf() && cur_node.IsInf()) {
+      // 如果optimal_node不是无穷大而cur_node是无穷大，那么应该淘汰cur_node
+      optimal_frame = item.first;
+    } else if (optimal_node.IsInf() && !cur_node.IsInf()) {
+      // do nothing
+    } else {
+      // 都不是无穷大
+      if (cur_node.LeastRecentK() < optimal_node.LeastRecentK()) {
+        optimal_frame = item.first;
+      }
     }
   }
 
-  if (!inf_node.empty()) {
-    frame_id_t tmp = -1;
-    for (const auto &item : inf_node) {
-      if (tmp == -1) {
-        tmp = item;
-        continue;
-      }
-      if (node_store_.at(tmp).MostRecent() < node_store_.at(item).MostRecent()) {
-        tmp = item;
-      }
-    }
-    *frame_id = tmp;
-
-    curr_size_--;
-    return true;
-  }
-
-  if (*frame_id == -1) {
+  if (!found) {
     return false;
   }
-  curr_size_--;
+  *frame_id = optimal_frame;
   return true;
 }
 

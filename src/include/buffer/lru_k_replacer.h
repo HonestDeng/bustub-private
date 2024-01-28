@@ -38,13 +38,8 @@ class LRUKNode {
   explicit LRUKNode(size_t k) : k_(k) {}
   auto Size() const -> size_t { return history_.size(); }
   auto MostRecent() const -> size_t { return history_.back(); }
-  auto LeastRecentK(size_t *timestamp) const -> bool {
-    if (history_.size() < k_) {
-      return false;
-    }
-    *timestamp = history_[history_.size() - k_];
-    return true;
-  }
+  auto LeastRecentK() const -> size_t { return history_[history_.size() - k_]; }
+  auto IsInf() const -> bool { return history_.size() < k_; }
   auto IsEvictable() const -> bool { return is_evictable_; }
 };
 
