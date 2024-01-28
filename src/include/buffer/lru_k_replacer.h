@@ -31,25 +31,21 @@ class LRUKNode {
   // Remove maybe_unused if you start using them. Feel free to change the member variables as you want.
 
   std::vector<size_t> history_;
-  [[maybe_unused]] size_t k_;
-
- public:
-  frame_id_t fid_;
+  size_t k_;
   bool is_evictable_{false};
 
-  LRUKNode(const frame_id_t fid, const size_t k) : k_(k), fid_(fid) {}
-
-  auto KDist(const size_t timestamp) const -> size_t {
+ public:
+  explicit LRUKNode(size_t k) : k_(k) {}
+  auto Size() const -> size_t { return history_.size(); }
+  auto MostRecent() const -> size_t { return history_.back(); }
+  auto LeastRecentK(size_t *timestamp) const -> bool {
     if (history_.size() < k_) {
-      return +LONG_MAX;
+      return false;
     }
-    return timestamp - history_[history_.size() - k_];
+    *timestamp = history_[history_.size() - k_];
+    return true;
   }
-  // should never return -1
-  auto LeastRecent() const -> size_t { return history_.empty() ? -1 : history_.back(); }
-
-  // Record a new access
-  void Record(const size_t timestamp) { history_.emplace_back(timestamp); }
+  auto IsEvictable() const -> bool { return is_evictable_; }
 };
 
 /**
@@ -169,7 +165,7 @@ class LRUKReplacer {
   std::unordered_map<frame_id_t, LRUKNode> node_store_;
   size_t current_timestamp_{0};
   size_t curr_size_{0};
-  size_t replacer_size_;  // 这两者有什么区别 我的理解是，replacer_size_是node_store的大小，curr_size_是evictable的大小
+  size_t replacer_size_;  // 这个replacer_size最多可以装多少个数据
   size_t k_;
   std::mutex latch_;
 };
