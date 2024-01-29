@@ -234,6 +234,8 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
   latch_.lock();
   // the page not in the pool
   if (page_table_.count(page_id) == 0) {
+    LOG_DEBUG("page not found.");
+    latch_.unlock();
     return true;
   }
   Page *page = pages_ + page_table_[page_id];
