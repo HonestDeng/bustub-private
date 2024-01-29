@@ -36,6 +36,7 @@ class LRUKNode {
 
  public:
   explicit LRUKNode(size_t k) : k_(k) {}
+  ~LRUKNode() = default;
   auto Size() const -> size_t { return history_.size(); }
   auto MostRecent() const -> size_t { return history_.back(); }
   auto LeastRecentK() const -> size_t { return history_[history_.size() - k_]; }

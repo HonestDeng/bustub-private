@@ -73,7 +73,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
   *frame_id = optimal_frame;
   node_store_.erase(optimal_frame);
   curr_size_--;
-  LOG_DEBUG("Evict frame %d", optimal_frame);
+//  LOG_DEBUG("Evict frame %d", optimal_frame);
   latch_.unlock();
   return true;
 }

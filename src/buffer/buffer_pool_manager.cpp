@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "buffer/buffer_pool_manager.h"
-
 #include "common/exception.h"
+#include "common/logger.h"
 #include "common/macros.h"
 #include "storage/page/page_guard.h"
 
@@ -27,6 +27,7 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager
   //      "exception line in `buffer_pool_manager.cpp`.");
 
   // we allocate a consecutive memory space for the buffer pool
+  LOG_DEBUG("Create a buffer pool manager with: pool_size = %zu, replacer_k = %zu", pool_size, replacer_k);
   pages_ = new Page[pool_size_];
   replacer_ = std::make_unique<LRUKReplacer>(pool_size, replacer_k);
 
@@ -36,9 +37,13 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager
   }
 }
 
-BufferPoolManager::~BufferPoolManager() { delete[] pages_; }
+BufferPoolManager::~BufferPoolManager() {
+  LOG_DEBUG("Destroy Buffer Pool Manager.");
+  delete[] pages_;
+}
 
 auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
+  LOG_DEBUG("Enter NewPage");
   latch_.lock();
   // 如果free_list中有空闲的frame
   Page *ret = nullptr;
@@ -85,20 +90,22 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
     replacer_->SetEvictable(page_table_[*page_id], false);
   }
   latch_.unlock();
+  LOG_DEBUG("new a page with id = %d", *page_id);
   // 没有空余的frame可以存放page了
   return ret;
 }
 
 auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType access_type) -> Page * {
+  LOG_DEBUG("Enter FetchPage with: page_id = %d", page_id);
   latch_.lock();
   // if the page requested in the pool
   if (page_table_.count(page_id) > 0) {
     auto frame_id = page_table_[page_id];
-    replacer_->RecordAccess(frame_id);  // 记录访问
     latch_.unlock();
     // set the replacer
     replacer_->RecordAccess(page_table_[page_id]);
     replacer_->SetEvictable(page_table_[page_id], false);
+    pages_[frame_id].pin_count_++;
     return pages_ + frame_id;
   }
 
@@ -150,16 +157,21 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     // set the replacer
     replacer_->RecordAccess(page_table_[page_id]);
     replacer_->SetEvictable(page_table_[page_id], false);
+    LOG_DEBUG("Fetch Page with page_id = %d", ret->page_id_);
+    latch_.unlock();
+    return ret;
   }
-
+  LOG_DEBUG("fail to fetch page.");
   latch_.unlock();
   return ret;
 }
 
 auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unused]] AccessType access_type) -> bool {
+  LOG_DEBUG("Enter UnpinPage with page_id = %d, is_dirty = %d", page_id, is_dirty);
   latch_.lock();
   // page not in the pool
   if (page_table_.count(page_id) == 0) {
+    LOG_DEBUG("page id not found in the page table");
     latch_.unlock();
     return false;
   }
@@ -167,6 +179,7 @@ auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unus
   Page *page = pages_ + page_table_[page_id];
   // pin_count is already 0
   if (page->pin_count_ == 0) {
+    LOG_DEBUG("pin_count already zero");
     latch_.unlock();
     return false;
   }
@@ -174,6 +187,7 @@ auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unus
   page->pin_count_--;
   if (page->pin_count_ == 0) {
     // set the page evictable
+    LOG_DEBUG("pin_count reach zero");
     replacer_->SetEvictable(page_table_[page_id], true);
   }
   page->is_dirty_ = is_dirty || page->is_dirty_;
@@ -182,6 +196,7 @@ auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unus
 }
 
 auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
+  LOG_DEBUG("Enter FluashPage with page_id = %uz", page_id);
   latch_.lock();
   if (page_table_.count(page_id) == 0) {
     latch_.unlock();
@@ -205,6 +220,7 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
 }
 
 void BufferPoolManager::FlushAllPages() {
+  LOG_DEBUG("Enter FlushAllPages");
   latch_.lock();
   for (const auto &item : page_table_) {
     auto &page_id = item.first;
@@ -214,6 +230,7 @@ void BufferPoolManager::FlushAllPages() {
 }
 
 auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
+  LOG_DEBUG("Enter DeletePage");
   latch_.lock();
   // the page not in the pool
   if (page_table_.count(page_id) == 0) {
@@ -222,6 +239,7 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
   Page *page = pages_ + page_table_[page_id];
   // the page is pinned
   if (page->pin_count_ > 0) {
+    LOG_DEBUG("Fail to delete: Page pinned");
     latch_.unlock();
     return false;
   }
