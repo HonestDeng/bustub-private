@@ -43,7 +43,9 @@ BufferPoolManager::~BufferPoolManager() {
 }
 
 auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
-  LOG_DEBUG("Enter NewPage");
+  auto t = std::this_thread::get_id();
+  uint32_t a = *(uint32_t *)&t;
+  LOG_DEBUG("tid = %u, Enter NewPage", a);
   latch_.lock();
   // 如果free_list中有空闲的frame
   Page *ret = nullptr;
@@ -66,9 +68,9 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
     // 如果page被修改过，则写回到磁盘中
     if (pages_[frame_id].is_dirty_ && pages_[frame_id].pin_count_ == 0) {
       // 因为这是evictable的，pin_count应该等于0
-      latch_.unlock();
+      //      latch_.unlock();
       FlushPage(pages_[frame_id].page_id_);
-      latch_.lock();
+      //      latch_.lock();
     }
     page_table_.erase(pages_[frame_id].page_id_);  // 删除原本的映射
 
@@ -96,16 +98,18 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
 }
 
 auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType access_type) -> Page * {
-  LOG_DEBUG("Enter FetchPage with: page_id = %d", page_id);
+  auto t = std::this_thread::get_id();
+  uint32_t a = *(uint32_t *)&t;
+  LOG_DEBUG("tid = %u, Enter FetchPage with: page_id = %d", a, page_id);
   latch_.lock();
   // if the page requested in the pool
   if (page_table_.count(page_id) > 0) {
     auto frame_id = page_table_[page_id];
-    latch_.unlock();
     // set the replacer
     replacer_->RecordAccess(page_table_[page_id]);
     replacer_->SetEvictable(page_table_[page_id], false);
     pages_[frame_id].pin_count_++;
+    latch_.unlock();
     return pages_ + frame_id;
   }
 
@@ -135,9 +139,9 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     // 如果page被修改过，则写回到磁盘中
     if (ret->is_dirty_ && ret->pin_count_ == 0) {
       // 因为这是evictable的，pin_count应该等于0
-      latch_.unlock();
+      //      latch_.unlock();
       FlushPage(ret->page_id_);
-      latch_.lock();
+      //      latch_.lock();
     }
     page_table_.erase(pages_[frame_id].page_id_);  // 删除原本的映射
 
@@ -167,7 +171,9 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
 }
 
 auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unused]] AccessType access_type) -> bool {
-  LOG_DEBUG("Enter UnpinPage with page_id = %d, is_dirty = %d", page_id, is_dirty);
+  auto t = std::this_thread::get_id();
+  uint32_t a = *(uint32_t *)&t;
+  LOG_DEBUG("tid = %u, Enter UnpinPage with page_id = %d, is_dirty = %d", a, page_id, is_dirty);
   latch_.lock();
   // page not in the pool
   if (page_table_.count(page_id) == 0) {
@@ -196,10 +202,10 @@ auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unus
 }
 
 auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
-  LOG_DEBUG("Enter FluashPage with page_id = %uz", page_id);
-  latch_.lock();
+  LOG_DEBUG("Enter FlushPage with page_id = %uz", page_id);
+  //  latch_.lock();
   if (page_table_.count(page_id) == 0) {
-    latch_.unlock();
+    //    latch_.unlock();
     return false;
   }
   frame_id_t frame_id = page_table_[page_id];
@@ -215,65 +221,80 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
   // clean meta data
   page->is_dirty_ = false;
 
-  latch_.unlock();
+  //  latch_.unlock();
   return true;
 }
 
 void BufferPoolManager::FlushAllPages() {
   LOG_DEBUG("Enter FlushAllPages");
-  latch_.lock();
+  //  latch_.lock();
   for (const auto &item : page_table_) {
     auto &page_id = item.first;
     FlushPage(page_id);
   }
-  latch_.unlock();
+  //  latch_.unlock();
 }
 
 auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
-  LOG_DEBUG("Enter DeletePage");
   latch_.lock();
-  // the page not in the pool
-  if (page_table_.count(page_id) == 0) {
-    LOG_DEBUG("page not found.");
+
+  // 1.
+  if (page_table_.find(page_id) == page_table_.end()) {
     latch_.unlock();
     return true;
   }
-  Page *page = pages_ + page_table_[page_id];
-  // the page is pinned
+  // 2.
+  frame_id_t frame_id = page_table_[page_id];
+  Page *page = &pages_[frame_id];
   if (page->pin_count_ > 0) {
-    LOG_DEBUG("Fail to delete: Page pinned");
     latch_.unlock();
     return false;
   }
-
-  // now the page can be deleted
+  if (page->is_dirty_) {
+    FlushPage(page_id);
+  }
+  // delete in disk in here
   DeallocatePage(page_id);
-  // reset metadata
-  frame_id_t frame_id = page_table_[page_id];
-  replacer_->Remove(frame_id);
-  page_table_.erase(page_id);
-  free_list_.push_front(frame_id);
 
+  page_table_.erase(page_id);
+  // reset metadata
+  page->is_dirty_ = false;
+  page->pin_count_ = 0;
+  page->page_id_ = INVALID_PAGE_ID;
+  // return it to the free list
+
+  free_list_.push_back(frame_id);
   latch_.unlock();
   return true;
 }
 
-auto BufferPoolManager::AllocatePage() -> page_id_t { return next_page_id_++; }
+auto BufferPoolManager::AllocatePage() -> page_id_t {
+  LOG_DEBUG("Enter AllocatePage");
+  return next_page_id_++;
+}
 
-auto BufferPoolManager::FetchPageBasic(page_id_t page_id) -> BasicPageGuard { return {this, FetchPage(page_id)}; }
+auto BufferPoolManager::FetchPageBasic(page_id_t page_id) -> BasicPageGuard {
+  LOG_DEBUG("Enter FetchPageBasic");
+  return {this, FetchPage(page_id)};
+}
 
 auto BufferPoolManager::FetchPageRead(page_id_t page_id) -> ReadPageGuard {
+  LOG_DEBUG("Enter FetchPageRead");
   auto ret = FetchPage(page_id);
   ret->RLatch();
   return {this, ret};
 }
 
 auto BufferPoolManager::FetchPageWrite(page_id_t page_id) -> WritePageGuard {
+  LOG_DEBUG("Enter FetchPageWrite");
   auto ret = FetchPage(page_id);
   ret->WLatch();
   return {this, ret};
 }
 
-auto BufferPoolManager::NewPageGuarded(page_id_t *page_id) -> BasicPageGuard { return {this, NewPage(page_id)}; }
+auto BufferPoolManager::NewPageGuarded(page_id_t *page_id) -> BasicPageGuard {
+  LOG_DEBUG("Enter NewPageGuarded");
+  return {this, NewPage(page_id)};
+}
 
 }  // namespace bustub
