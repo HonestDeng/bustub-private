@@ -44,7 +44,7 @@ BufferPoolManager::~BufferPoolManager() {
 
 auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
   auto t = std::this_thread::get_id();
-  uint32_t a = *(uint32_t *)&t;
+  uint32_t a = *reinterpret_cast<uint32_t *>(&t);
   LOG_DEBUG("tid = %u, Enter NewPage", a);
   latch_.lock();
   // 如果free_list中有空闲的frame
@@ -90,6 +90,7 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
     // set the replacer
     replacer_->RecordAccess(page_table_[*page_id]);  // 先记录访问，然后再设置non-evictable
     replacer_->SetEvictable(page_table_[*page_id], false);
+    BUSTUB_ASSERT(*page_id == ret->page_id_, "Page ID not match");
   }
   latch_.unlock();
   LOG_DEBUG("new a page with id = %d", *page_id);
@@ -99,7 +100,7 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
 
 auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType access_type) -> Page * {
   auto t = std::this_thread::get_id();
-  uint32_t a = *(uint32_t *)&t;
+  uint32_t a = *reinterpret_cast<uint32_t *>(&t);
   LOG_DEBUG("tid = %u, Enter FetchPage with: page_id = %d", a, page_id);
   latch_.lock();
   // if the page requested in the pool
@@ -109,6 +110,7 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     replacer_->RecordAccess(page_table_[page_id]);
     replacer_->SetEvictable(page_table_[page_id], false);
     pages_[frame_id].pin_count_++;
+    BUSTUB_ASSERT(page_id == (pages_ + frame_id)->page_id_, "Page ID not match");
     latch_.unlock();
     return pages_ + frame_id;
   }
@@ -162,6 +164,7 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     replacer_->RecordAccess(page_table_[page_id]);
     replacer_->SetEvictable(page_table_[page_id], false);
     LOG_DEBUG("Fetch Page with page_id = %d", ret->page_id_);
+    BUSTUB_ASSERT(page_id == ret->page_id_, "Page ID not match");
     latch_.unlock();
     return ret;
   }
@@ -172,7 +175,7 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
 
 auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unused]] AccessType access_type) -> bool {
   auto t = std::this_thread::get_id();
-  uint32_t a = *(uint32_t *)&t;
+  uint32_t a = *reinterpret_cast<uint32_t *>(&t);
   LOG_DEBUG("tid = %u, Enter UnpinPage with page_id = %d, is_dirty = %d", a, page_id, is_dirty);
   latch_.lock();
   // page not in the pool

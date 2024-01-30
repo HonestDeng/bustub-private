@@ -81,10 +81,10 @@ struct BpmMetrics {
     auto now = ClockMs();
     auto elsped = now - start_time_;
     if (elsped - last_report_at_ > 1000) {
-      fmt::print(stderr, "[{:5.2f}] {}: total_cnt={:<10} throughput={:<10.3f} avg_throughput={:<10.3f}\n",
-                 elsped / 1000.0, reporter_, cnt_,
-                 (cnt_ - last_cnt_) / static_cast<double>(elsped - last_report_at_) * 1000,
-                 cnt_ / static_cast<double>(elsped) * 1000);
+//      fmt::print(stderr, "[{:5.2f}] {}: total_cnt={:<10} throughput={:<10.3f} avg_throughput={:<10.3f}\n",
+//                 elsped / 1000.0, reporter_, cnt_,
+//                 (cnt_ - last_cnt_) / static_cast<double>(elsped - last_report_at_) * 1000,
+//                 cnt_ / static_cast<double>(elsped) * 1000);
       last_report_at_ = elsped;
       last_cnt_ = cnt_;
     }

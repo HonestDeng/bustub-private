@@ -144,10 +144,10 @@ void OutputLogHeader(const char *file, int line, const char *func, int level);
 #define LOG_DEBUG_ENABLED
 // #pragma message("LOG_DEBUG was enabled.")
 #define LOG_DEBUG(...)                                                      \
-  OutputLogHeader(__SHORT_FILE__, __LINE__, __FUNCTION__, LOG_LEVEL_DEBUG); \
-  ::fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__);                                \
-  fprintf(LOG_OUTPUT_STREAM, "\n");                                         \
-  ::fflush(stdout)
+//  OutputLogHeader(__SHORT_FILE__, __LINE__, __FUNCTION__, LOG_LEVEL_DEBUG); //
+//  ::fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__);                                \
+//  fprintf(LOG_OUTPUT_STREAM, "\n");                                         \
+//  ::fflush(stdout)
 #else
 #define LOG_DEBUG(...) ((void)0)
 #endif
