@@ -207,6 +207,10 @@ class BufferPoolManager {
     // This is a no-nop right now without a more complex data structure to track deallocated pages
   }
 
+  auto FlushPageNoLock(page_id_t page_id) -> bool;
+  void FlushAllPagesNoLock();
+
+
   // TODO(student): You may add additional private members and helper functions
 };
 }  // namespace bustub

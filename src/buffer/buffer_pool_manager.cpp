@@ -17,13 +17,6 @@
 #include "storage/page/page_guard.h"
 
 namespace bustub {
-
-struct BustubBenchPageHeader {
-  uint64_t seed_;
-  uint64_t page_id_;
-  char data_[0];
-};
-
 BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager, size_t replacer_k,
                                      LogManager *log_manager)
     : pool_size_(pool_size), disk_scheduler_(std::make_unique<DiskScheduler>(disk_manager)), log_manager_(log_manager) {
@@ -75,7 +68,7 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
     if (pages_[frame_id].is_dirty_ && pages_[frame_id].pin_count_ == 0) {
       // 因为这是evictable的，pin_count应该等于0
       //      latch_.unlock();
-      FlushPage(pages_[frame_id].page_id_);
+      FlushPageNoLock(pages_[frame_id].page_id_);
       //      latch_.lock();
     }
     page_table_.erase(pages_[frame_id].page_id_);  // 删除原本的映射
@@ -138,8 +131,9 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     // if fail to read
     bool c = future1.get();
     BUSTUB_ASSERT(c == true, "fail to read page");
-    if(c == false) {
+    if (!c) {
       std::cout << "这里出错啊啊啊啊啊" << std::endl;
+      std::terminate();
     }
   } else if (replacer_->Size() > 0) {  // if there is a evictable page
     // 腾出空间
@@ -152,8 +146,7 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     if (ret->is_dirty_ && ret->pin_count_ == 0) {
       // 因为这是evictable的，pin_count应该等于0
       //      latch_.unlock();
-      FlushPage(ret->page_id_);
-//      ret->ResetMemory();
+      FlushPageNoLock(ret->page_id_);
       //      latch_.lock();
     }
     page_table_.erase(pages_[frame_id].page_id_);  // 删除原本的映射
@@ -165,8 +158,9 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     // if fail to read
     bool c = future1.get();
     BUSTUB_ASSERT(c == true, "fail to read page");
-    if(c == false) {
+    if (!c) {
       std::cout << "这里出错啊啊啊啊啊" << std::endl;
+      std::terminate();
     }
   }
 
@@ -189,76 +183,104 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
 }
 
 auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unused]] AccessType access_type) -> bool {
-  auto t = std::this_thread::get_id();
-  uint32_t a = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter UnpinPage with page_id = %d, is_dirty = %d", a, page_id, is_dirty);
   latch_.lock();
-  // page not in the pool
-  if (page_table_.count(page_id) == 0) {
-    LOG_DEBUG("page id not found in the page table");
+  // 1. 如果page_table中就没有
+  auto iter = page_table_.find(page_id);
+  if (iter == page_table_.end()) {
     latch_.unlock();
     return false;
   }
-
-  Page *page = pages_ + page_table_[page_id];
-  // pin_count is already 0
-  if (page->pin_count_ == 0) {
-    LOG_DEBUG("pin_count already zero");
+  // 2. 找到要被unpin的page
+  frame_id_t unpinned_fid = iter->second;
+  Page *unpinned_page = &pages_[unpinned_fid];
+  if (is_dirty) {
+    unpinned_page->is_dirty_ = true;
+  }
+  // if page的pin_count == 0 则直接return
+  if (unpinned_page->pin_count_ == 0) {
     latch_.unlock();
     return false;
   }
-
-  page->pin_count_--;
-  if (page->pin_count_ == 0) {
-    // set the page evictable
-    LOG_DEBUG("pin_count reach zero");
-    replacer_->SetEvictable(page_table_[page_id], true);
+  unpinned_page->pin_count_--;
+  if (unpinned_page->GetPinCount() == 0) {
+    replacer_->SetEvictable(unpinned_fid, true);
   }
-  page->is_dirty_ = is_dirty || page->is_dirty_;
   latch_.unlock();
   return true;
 }
 
 auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
   LOG_DEBUG("Enter FlushPage with page_id = %uz", page_id);
-  //  latch_.lock();
+  latch_.lock();
   if (page_table_.count(page_id) == 0) {
-    //    latch_.unlock();
+    latch_.unlock();
     return false;
   }
   frame_id_t frame_id = page_table_[page_id];
   Page *page = pages_ + frame_id;
 
-  auto *pg = reinterpret_cast<BustubBenchPageHeader *>(page->GetData());
-  std::cout << pg->page_id_;
-  assert(pg->page_id_ == page_id);
   // 将数据写入磁盘
   auto promise1 = disk_scheduler_->CreatePromise();
   auto future1 = promise1.get_future();
   disk_scheduler_->Schedule({/*is_write=*/true, page->GetData(), /*page_id=*/page_id, std::move(promise1)});
   // if fail to read
   bool c = future1.get();
-  BUSTUB_ASSERT(a == true, "fail to read page");
-  if(c == false) {
-    std::cout << "asdfasdfasdfasdfasdfasd" << std::endl;
+  BUSTUB_ASSERT(c == true, "fail to read page");
+  if (!c) {
+    std::cout << "这里出错啊啊啊啊啊" << std::endl;
+    latch_.unlock();
+    std::terminate();
   }
-
 
   // clean meta data
   page->is_dirty_ = false;
 
-  //  latch_.unlock();
+  latch_.unlock();
+  return true;
+}
+
+auto BufferPoolManager::FlushPageNoLock(page_id_t page_id) -> bool {
+  LOG_DEBUG("Enter FlushPage with page_id = %uz", page_id);
+  if (page_table_.count(page_id) == 0) {
+    return false;
+  }
+  frame_id_t frame_id = page_table_[page_id];
+  Page *page = pages_ + frame_id;
+
+  // 将数据写入磁盘
+  auto promise1 = disk_scheduler_->CreatePromise();
+  auto future1 = promise1.get_future();
+  disk_scheduler_->Schedule({/*is_write=*/true, page->GetData(), /*page_id=*/page_id, std::move(promise1)});
+  // if fail to read
+  bool c = future1.get();
+  BUSTUB_ASSERT(c == true, "fail to read page");
+  if (!c) {
+    std::cout << "这里出错啊啊啊啊啊" << std::endl;
+    std::terminate();
+  }
+
+  // clean meta data
+  page->is_dirty_ = false;
+
   return true;
 }
 
 void BufferPoolManager::FlushAllPages() {
   LOG_DEBUG("Enter FlushAllPages");
-  //  latch_.lock();
+  latch_.lock();
   for (const auto &item : page_table_) {
     auto &page_id = item.first;
-    FlushPage(page_id);
+    FlushPageNoLock(page_id);
   }
-  //  latch_.unlock();
+  latch_.unlock();
+}
+
+void BufferPoolManager::FlushAllPagesNoLock() {
+  LOG_DEBUG("Enter FlushAllPages");
+  for (const auto &item : page_table_) {
+    auto &page_id = item.first;
+    FlushPageNoLock(page_id);
+  }
 }
 
 auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
@@ -277,7 +299,7 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
     return false;
   }
   if (page->is_dirty_) {
-    FlushPage(page_id);
+    FlushPageNoLock(page_id);
   }
   // delete in disk in here
   DeallocatePage(page_id);
