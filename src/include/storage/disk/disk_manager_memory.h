@@ -98,11 +98,6 @@ class DiskManagerUnlimitedMemory : public DiskManager {
     l.unlock();
 
     memcpy(ptr->first.data(), page_data, BUSTUB_PAGE_SIZE);
-
-    auto *pg = reinterpret_cast<BustubBenchPageHeader1 *>(ptr->first.data());
-    std::cout << pg->page_id_;
-    assert(pg->page_id_ == page_id);
-
     PostProcessLatency(page_id);
   }
 
@@ -134,10 +129,6 @@ class DiskManagerUnlimitedMemory : public DiskManager {
     l.unlock();
 
     memcpy(page_data, ptr->first.data(), BUSTUB_PAGE_SIZE);
-    auto *pg = reinterpret_cast<BustubBenchPageHeader1 *>(ptr->first.data());
-    std::cout << pg->page_id_;
-    assert(pg->page_id_ == page_id);
-
     PostProcessLatency(page_id);
   }
 
