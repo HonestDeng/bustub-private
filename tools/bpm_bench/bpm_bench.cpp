@@ -25,6 +25,7 @@
 
 #include <sys/time.h>
 
+#include <iostream>
 auto ClockMs() -> uint64_t {
   struct timeval tm;
   gettimeofday(&tm, nullptr);
@@ -216,6 +217,10 @@ auto main(int argc, char **argv) -> int {
     page_ids.push_back(page_id);
   }
 
+//  auto *page = bpm->FetchPage(page_ids[0], AccessType::Scan);
+//  auto *pg = reinterpret_cast<BustubBenchPageHeader *>(page->GetData());
+//  std::cout << pg->page_id_;
+
   // enable disk latency after creating all pages
   disk_manager->EnableLatencySimulator(enable_latency != 0);
 
@@ -264,35 +269,35 @@ auto main(int argc, char **argv) -> int {
     });
   }
 
-  for (size_t thread_id = 0; thread_id < get_thread_n; thread_id++) {
-    threads.emplace_back([thread_id, &page_ids, &bpm, bustub_page_cnt, duration_ms, &total_metrics] {
-      std::random_device r;
-      std::default_random_engine gen(r());
-      zipfian_int_distribution<size_t> dist(0, bustub_page_cnt - 1, 0.8);
-
-      BpmMetrics metrics(fmt::format("get  {:>2}", thread_id), duration_ms);
-      metrics.Begin();
-
-      while (!metrics.ShouldFinish()) {
-        auto page_idx = dist(gen);
-        auto *page = bpm->FetchPage(page_ids[page_idx], AccessType::Lookup);
-        if (page == nullptr) {
-          fmt::println(stderr, "cannot fetch page");
-          std::terminate();
-        }
-
-        page->RLatch();
-        CheckPageConsistentNoSeed(page->GetData(), page_idx);
-        page->RUnlatch();
-
-        bpm->UnpinPage(page->GetPageId(), false, AccessType::Lookup);
-        metrics.Tick();
-        metrics.Report();
-      }
-
-      total_metrics.ReportGet(metrics.cnt_);
-    });
-  }
+//  for (size_t thread_id = 0; thread_id < get_thread_n; thread_id++) {
+//    threads.emplace_back([thread_id, &page_ids, &bpm, bustub_page_cnt, duration_ms, &total_metrics] {
+//      std::random_device r;
+//      std::default_random_engine gen(r());
+//      zipfian_int_distribution<size_t> dist(0, bustub_page_cnt - 1, 0.8);
+//
+//      BpmMetrics metrics(fmt::format("get  {:>2}", thread_id), duration_ms);
+//      metrics.Begin();
+//
+//      while (!metrics.ShouldFinish()) {
+//        auto page_idx = dist(gen);
+//        auto *page = bpm->FetchPage(page_ids[page_idx], AccessType::Lookup);
+//        if (page == nullptr) {
+//          fmt::println(stderr, "cannot fetch page");
+//          std::terminate();
+//        }
+//
+//        page->RLatch();
+//        CheckPageConsistentNoSeed(page->GetData(), page_idx);
+//        page->RUnlatch();
+//
+//        bpm->UnpinPage(page->GetPageId(), false, AccessType::Lookup);
+//        metrics.Tick();
+//        metrics.Report();
+//      }
+//
+//      total_metrics.ReportGet(metrics.cnt_);
+//    });
+//  }
 
   for (auto &thread : threads) {
     thread.join();

@@ -28,8 +28,15 @@
 #include "common/logger.h"
 #include "fmt/core.h"
 #include "storage/disk/disk_manager.h"
+#include <cassert>
 
 namespace bustub {
+
+struct BustubBenchPageHeader1 {
+  uint64_t seed_;
+  uint64_t page_id_;
+  char data_[0];
+};
 
 /**
  * DiskManagerMemory replicates the utility of DiskManager on memory. It is primarily used for
@@ -73,6 +80,7 @@ class DiskManagerUnlimitedMemory : public DiskManager {
    * @param page_data raw page data
    */
   void WritePage(page_id_t page_id, const char *page_data) override {
+    std::cout << "Enter WritePage" << std::endl;
     ProcessLatency(page_id);
 
     std::unique_lock<std::mutex> l(mutex_);
@@ -91,6 +99,10 @@ class DiskManagerUnlimitedMemory : public DiskManager {
 
     memcpy(ptr->first.data(), page_data, BUSTUB_PAGE_SIZE);
 
+    auto *pg = reinterpret_cast<BustubBenchPageHeader1 *>(ptr->first.data());
+    std::cout << pg->page_id_;
+    assert(pg->page_id_ == page_id);
+
     PostProcessLatency(page_id);
   }
 
@@ -100,6 +112,7 @@ class DiskManagerUnlimitedMemory : public DiskManager {
    * @param[out] page_data output buffer
    */
   void ReadPage(page_id_t page_id, char *page_data) override {
+    std::cout << "Enter ReadPage" << std::endl;
     ProcessLatency(page_id);
 
     std::unique_lock<std::mutex> l(mutex_);
@@ -121,6 +134,9 @@ class DiskManagerUnlimitedMemory : public DiskManager {
     l.unlock();
 
     memcpy(page_data, ptr->first.data(), BUSTUB_PAGE_SIZE);
+    auto *pg = reinterpret_cast<BustubBenchPageHeader1 *>(ptr->first.data());
+    std::cout << pg->page_id_;
+    assert(pg->page_id_ == page_id);
 
     PostProcessLatency(page_id);
   }

@@ -18,6 +18,12 @@
 
 namespace bustub {
 
+struct BustubBenchPageHeader {
+  uint64_t seed_;
+  uint64_t page_id_;
+  char data_[0];
+};
+
 BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager, size_t replacer_k,
                                      LogManager *log_manager)
     : pool_size_(pool_size), disk_scheduler_(std::make_unique<DiskScheduler>(disk_manager)), log_manager_(log_manager) {
@@ -130,7 +136,11 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     auto future1 = promise1.get_future();
     disk_scheduler_->Schedule({/*is_write=*/false, ret->GetData(), /*page_id=*/page_id, std::move(promise1)});
     // if fail to read
-    BUSTUB_ASSERT(future1.get() == true, "fail to read page");
+    bool c = future1.get();
+    BUSTUB_ASSERT(c == true, "fail to read page");
+    if(c == false) {
+      std::cout << "这里出错啊啊啊啊啊" << std::endl;
+    }
   } else if (replacer_->Size() > 0) {  // if there is a evictable page
     // 腾出空间
     frame_id_t frame_id;
@@ -143,6 +153,7 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
       // 因为这是evictable的，pin_count应该等于0
       //      latch_.unlock();
       FlushPage(ret->page_id_);
+//      ret->ResetMemory();
       //      latch_.lock();
     }
     page_table_.erase(pages_[frame_id].page_id_);  // 删除原本的映射
@@ -152,7 +163,11 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     auto future1 = promise1.get_future();
     disk_scheduler_->Schedule({/*is_write=*/false, ret->GetData(), /*page_id=*/page_id, std::move(promise1)});
     // if fail to read
-    BUSTUB_ASSERT(future1.get() == true, "fail to read page");
+    bool c = future1.get();
+    BUSTUB_ASSERT(c == true, "fail to read page");
+    if(c == false) {
+      std::cout << "这里出错啊啊啊啊啊" << std::endl;
+    }
   }
 
   if (ret != nullptr) {
@@ -214,12 +229,20 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
   frame_id_t frame_id = page_table_[page_id];
   Page *page = pages_ + frame_id;
 
+  auto *pg = reinterpret_cast<BustubBenchPageHeader *>(page->GetData());
+  std::cout << pg->page_id_;
+  assert(pg->page_id_ == page_id);
   // 将数据写入磁盘
   auto promise1 = disk_scheduler_->CreatePromise();
   auto future1 = promise1.get_future();
   disk_scheduler_->Schedule({/*is_write=*/true, page->GetData(), /*page_id=*/page_id, std::move(promise1)});
   // if fail to read
-  BUSTUB_ASSERT(future1.get() == true, "fail to read page");
+  bool c = future1.get();
+  BUSTUB_ASSERT(a == true, "fail to read page");
+  if(c == false) {
+    std::cout << "asdfasdfasdfasdfasdfasd" << std::endl;
+  }
+
 
   // clean meta data
   page->is_dirty_ = false;
