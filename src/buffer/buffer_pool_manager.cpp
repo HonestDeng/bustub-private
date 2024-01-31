@@ -183,6 +183,9 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
 }
 
 auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unused]] AccessType access_type) -> bool {
+  auto t = std::this_thread::get_id();
+  uint32_t a = *reinterpret_cast<uint32_t *>(&t);
+  LOG_DEBUG("tid = %u, Enter UnpinPage with page_id = %d, is_dirty = %d", a, page_id, is_dirty);
   latch_.lock();
   // 1. 如果page_table中就没有
   auto iter = page_table_.find(page_id);
