@@ -23,6 +23,11 @@ auto ExtendibleHTableHeaderPage::HashToDirectoryIndex(uint32_t hash) const -> ui
   return index;
 }
 
+auto ExtendibleHTableHeaderPage::HashToDirectoryPageId(uint32_t hash) const -> uint32_t {
+  auto index = HashToDirectoryIndex(hash);
+  return directory_page_ids_[index];
+}
+
 auto ExtendibleHTableHeaderPage::GetDirectoryPageId(uint32_t directory_idx) const -> uint32_t {
   return directory_page_ids_[directory_idx];
 }

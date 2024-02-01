@@ -23,12 +23,17 @@ namespace bustub {
 void ExtendibleHTableDirectoryPage::Init(uint32_t max_depth) { this->max_depth_ = max_depth; }
 
 auto ExtendibleHTableDirectoryPage::HashToBucketIndex(uint32_t hash) const -> uint32_t {
-  auto index = hash & ~(0xffffffff << global_depth_);
+  auto index = hash & GetGlobalDepth();
   return index;
 }
 
 auto ExtendibleHTableDirectoryPage::GetBucketPageId(uint32_t bucket_idx) const -> page_id_t {
   return bucket_page_ids_[bucket_idx];
+}
+
+auto ExtendibleHTableDirectoryPage::HashToBucketPageId(uint32_t hash) const -> page_id_t {
+  auto index = hash & ~(0xffffffff << global_depth_);
+  return bucket_page_ids_[index];
 }
 
 void ExtendibleHTableDirectoryPage::SetBucketPageId(uint32_t bucket_idx, page_id_t bucket_page_id) {
@@ -71,8 +76,20 @@ void ExtendibleHTableDirectoryPage::SetLocalDepth(uint32_t bucket_idx, uint8_t l
   local_depths_[bucket_idx] = local_depth;
 }
 
-void ExtendibleHTableDirectoryPage::IncrLocalDepth(uint32_t bucket_idx) { local_depths_[bucket_idx]++; }
+void ExtendibleHTableDirectoryPage::IncrLocalDepth(uint32_t bucket_idx) {
+  if(local_depths_[bucket_idx] >= global_depth_) {
+    IncrGlobalDepth();
+  }
+  local_depths_[bucket_idx]++;
+}
 
 void ExtendibleHTableDirectoryPage::DecrLocalDepth(uint32_t bucket_idx) { local_depths_[bucket_idx]--; }
+
+auto ExtendibleHTableDirectoryPage::GetGlobalDepthMask() const -> uint32_t { return ~(0xffffffff << global_depth_); }
+
+auto ExtendibleHTableDirectoryPage::GetLocalDepthMask(uint32_t bucket_idx) const -> uint32_t {
+  return ~(0xffffffff << local_depths_[bucket_idx]);
+}
+auto ExtendibleHTableDirectoryPage::MaxSize() const -> uint32_t { return 1 << max_depth_; }
 
 }  // namespace bustub

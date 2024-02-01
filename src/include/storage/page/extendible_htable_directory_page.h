@@ -71,6 +71,8 @@ class ExtendibleHTableDirectoryPage {
    */
   auto GetBucketPageId(uint32_t bucket_idx) const -> page_id_t;
 
+  auto HashToBucketPageId(uint32_t bucket_idx) const -> page_id_t;
+
   /**
    * Updates the directory index using a bucket index and page_id
    *

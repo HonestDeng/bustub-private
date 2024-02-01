@@ -57,6 +57,7 @@ template <typename K, typename V, typename KC>
 auto ExtendibleHTableBucketPage<K, V, KC>::Remove(const K &key, const KC &cmp) -> bool {
   for (uint32_t i = 0; i < size_; i++) {
     const auto &item = array_[i];
+    // 既不大于也不小于就是等于
     if (!cmp(item.first, key) && !cmp(key, item.first)) {
       // 用最后一个覆盖被删除的键值对
       array_[i] = array_[--this->size_];

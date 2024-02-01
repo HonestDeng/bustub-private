@@ -58,6 +58,8 @@ class ExtendibleHTableHeaderPage {
    */
   auto GetDirectoryPageId(uint32_t directory_idx) const -> uint32_t;
 
+  auto HashToDirectoryPageId(uint32_t hash) const -> uint32_t;
+
   /**
    * @brief Set the directory page id at an index
    *
