@@ -49,7 +49,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
     auto &optimal_node = node_store_.at(optimal_frame);
     auto &cur_node = node_store_.at(item.first);
     if (cur_node.IsInf() && optimal_node.IsInf()) {
-      // 如果两个节点都是无穷大，选择最近一次访问最早的淘汰
+      // 如果两个节点都是无穷大，选择第一次访问最早的页淘汰
       if (cur_node.EarliestRecord() < optimal_node.EarliestRecord()) {
         // 如果cur_node的最近一次访问时间小于optimal_node的，那么说明cur_node的访问时间比optimal_node早
         optimal_frame = item.first;
