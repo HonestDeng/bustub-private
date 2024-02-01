@@ -23,7 +23,7 @@ namespace bustub {
 void ExtendibleHTableDirectoryPage::Init(uint32_t max_depth) { this->max_depth_ = max_depth; }
 
 auto ExtendibleHTableDirectoryPage::HashToBucketIndex(uint32_t hash) const -> uint32_t {
-  auto index = hash & GetGlobalDepth();
+  auto index = hash & GetGlobalDepthMask();
   return index;
 }
 
@@ -41,10 +41,12 @@ void ExtendibleHTableDirectoryPage::SetBucketPageId(uint32_t bucket_idx, page_id
 }
 
 auto ExtendibleHTableDirectoryPage::GetSplitImageIndex(uint32_t bucket_idx) const -> uint32_t {
-  return bucket_idx ^ (1 << (global_depth_ - 1));  // 001的split image是101
+  return bucket_idx ^ (1 << (local_depths_[bucket_idx]));  // 001的split image是101
 }
 
 auto ExtendibleHTableDirectoryPage::GetGlobalDepth() const -> uint32_t { return global_depth_; }
+
+auto ExtendibleHTableDirectoryPage::GetMaxDepth() const -> uint32_t { return max_depth_; }
 
 void ExtendibleHTableDirectoryPage::IncrGlobalDepth() {
   int offset = 1 << global_depth_;
@@ -77,7 +79,7 @@ void ExtendibleHTableDirectoryPage::SetLocalDepth(uint32_t bucket_idx, uint8_t l
 }
 
 void ExtendibleHTableDirectoryPage::IncrLocalDepth(uint32_t bucket_idx) {
-  if(local_depths_[bucket_idx] >= global_depth_) {
+  if (local_depths_[bucket_idx] >= global_depth_) {
     IncrGlobalDepth();
   }
   local_depths_[bucket_idx]++;
