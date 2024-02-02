@@ -73,7 +73,11 @@ auto DiskExtendibleHashTable<K, V, KC>::GetValue(const K &key, std::vector<V> *r
   auto guard_bucket = bpm_->FetchPageWrite(bucket_page_id);
   auto bucket_page = guard_bucket.template As<ExtendibleHTableBucketPage<K, V, KC>>();
   result->resize(1);
-  return bucket_page->Lookup(key, result->at(0), cmp_);
+  if (bucket_page->Lookup(key, result->at(0), cmp_)) {
+    return true;
+  }
+  result->pop_back();
+  return false;
 }
 
 /*****************************************************************************
@@ -110,7 +114,7 @@ auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Tra
   auto bucket_page = guard_bucket.template AsMut<ExtendibleHTableBucketPage<K, V, KC>>();
   while (bucket_page->IsFull()) {
     auto bucket_idx = dir_page->HashToBucketIndex(hash);
-    if(dir_page->GetLocalDepth(bucket_idx) >= dir_page->GetMaxDepth()) {
+    if (dir_page->GetLocalDepth(bucket_idx) >= dir_page->GetMaxDepth()) {
       // 如果bucket已经满了，已经无法再扩张了，那么就无法再插入键值对
       return false;
     }
@@ -203,7 +207,7 @@ auto DiskExtendibleHashTable<K, V, KC>::Remove(const K &key, Transaction *transa
 
   // 怎么知道hash对应的那个directory page存在
   auto hash = Hash(key);
-  auto dir_page_id = header_page->HashToDirectoryIndex(hash);
+  auto dir_page_id = header_page->HashToDirectoryPageId(hash);
   if (dir_page_id == 0 || dir_page_id == static_cast<uint32_t>(INVALID_PAGE_ID)) {
     return false;
   }
@@ -218,7 +222,7 @@ auto DiskExtendibleHashTable<K, V, KC>::Remove(const K &key, Transaction *transa
   }
 
   auto guard_bucket = bpm_->FetchPageWrite(bucket_page_id);
-  auto bucket_page = guard.template AsMut<ExtendibleHTableBucketPage<K, V, KC>>();
+  auto bucket_page = guard_bucket.template AsMut<ExtendibleHTableBucketPage<K, V, KC>>();
   return bucket_page->Remove(key, cmp_);
 }
 
