@@ -27,7 +27,6 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager
   //      "exception line in `buffer_pool_manager.cpp`.");
 
   // we allocate a consecutive memory space for the buffer pool
-  LOG_DEBUG("Create a buffer pool manager with: pool_size = %zu, replacer_k = %zu", pool_size, replacer_k);
   pages_ = new Page[pool_size_];
   replacer_ = std::make_unique<LRUKReplacer>(pool_size, replacer_k);
 
@@ -38,14 +37,10 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager
 }
 
 BufferPoolManager::~BufferPoolManager() {
-  LOG_DEBUG("Destroy Buffer Pool Manager.");
   delete[] pages_;
 }
 
 auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
-  auto t = std::this_thread::get_id();
-  uint32_t tid = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter NewPage", tid);
   latch_.lock();
   // 如果free_list中有空闲的frame
   Page *ret = nullptr;
@@ -87,7 +82,6 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
     // set the replacer
     replacer_->RecordAccess(page_table_[*page_id]);  // 先记录访问，然后再设置non-evictable
     replacer_->SetEvictable(page_table_[*page_id], false);
-    LOG_DEBUG("tid = %u, new a page with id = %d", tid, *page_id);
   }
   latch_.unlock();
   // 没有空余的frame可以存放page了
@@ -95,9 +89,6 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
 }
 
 auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType access_type) -> Page * {
-  auto t = std::this_thread::get_id();
-  uint32_t tid = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter FetchPage with: page_id = %d", tid, page_id);
   latch_.lock();
   // if the page requested in the pool
   if (page_table_.count(page_id) > 0) {
@@ -128,7 +119,6 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     // if fail to read
     bool c = future1.get();
     if (!c) {
-      std::cout << "Fail to read a page with page id = from disk" << page_id << std::endl;
       std::terminate();
     }
   } else if (replacer_->Size() > 0) {  // if there is a evictable page
@@ -152,7 +142,6 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     // if fail to read
     bool c = future1.get();
     if (!c) {
-      std::cout << "Fail to read a page with page id = from disk" << page_id << std::endl;
       std::terminate();
     }
   }
@@ -165,20 +154,15 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     // set the replacer
     replacer_->RecordAccess(page_table_[page_id]);
     replacer_->SetEvictable(page_table_[page_id], false);
-    LOG_DEBUG("tid = %u, Fetch Page with page_id = %d", tid, ret->page_id_);
 
     latch_.unlock();
     return ret;
   }
-  LOG_DEBUG("tid = %u, fail to fetch page.", tid);
   latch_.unlock();
   return ret;
 }
 
 auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unused]] AccessType access_type) -> bool {
-  auto t = std::this_thread::get_id();
-  uint32_t tid = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter UnpinPage with page_id = %d, is_dirty = %d", tid, page_id, is_dirty);
   latch_.lock();
   // 1. 如果page_table中就没有
   auto iter = page_table_.find(page_id);
@@ -206,9 +190,6 @@ auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unus
 }
 
 auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
-  auto t = std::this_thread::get_id();
-  uint32_t tid = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter FlushPage with page_id = %uz", tid, page_id);
   latch_.lock();
   if (page_table_.count(page_id) == 0) {
     latch_.unlock();
@@ -237,9 +218,6 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
 }
 
 auto BufferPoolManager::FlushPageNoLock(page_id_t page_id) -> bool {
-  auto t = std::this_thread::get_id();
-  uint32_t tid = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter FlushPageNoLock with page_id = %uz", tid, page_id);
   if (page_table_.count(page_id) == 0) {
     return false;
   }
@@ -264,9 +242,6 @@ auto BufferPoolManager::FlushPageNoLock(page_id_t page_id) -> bool {
 }
 
 void BufferPoolManager::FlushAllPages() {
-  auto t = std::this_thread::get_id();
-  uint32_t tid = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter FlushAllPage", tid);
   latch_.lock();
   for (const auto &item : page_table_) {
     auto &page_id = item.first;
@@ -276,9 +251,6 @@ void BufferPoolManager::FlushAllPages() {
 }
 
 void BufferPoolManager::FlushAllPagesNoLock() {
-  auto t = std::this_thread::get_id();
-  uint32_t tid = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter FlushAllPagesNoLock", tid);
   for (const auto &item : page_table_) {
     auto &page_id = item.first;
     FlushPageNoLock(page_id);
@@ -286,10 +258,6 @@ void BufferPoolManager::FlushAllPagesNoLock() {
 }
 
 auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
-  auto t = std::this_thread::get_id();
-  uint32_t tid = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter DeletePage with page_id = %uz", tid, page_id);
-
   latch_.lock();
 
   // 1.
@@ -323,41 +291,26 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
 }
 
 auto BufferPoolManager::AllocatePage() -> page_id_t {
-  auto t = std::this_thread::get_id();
-  uint32_t tid = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter AllocatePage", tid);
   return next_page_id_++;
 }
 
 auto BufferPoolManager::FetchPageBasic(page_id_t page_id) -> BasicPageGuard {
-  auto t = std::this_thread::get_id();
-  uint32_t tid = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter FetchPageBasic with page_id = %uz", tid, page_id);
   return {this, FetchPage(page_id)};
 }
 
 auto BufferPoolManager::FetchPageRead(page_id_t page_id) -> ReadPageGuard {
-  auto t = std::this_thread::get_id();
-  uint32_t tid = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter FetchPageRead with page_id = %uz", tid, page_id);
   auto ret = FetchPage(page_id);
   ret->RLatch();
   return {this, ret};
 }
 
 auto BufferPoolManager::FetchPageWrite(page_id_t page_id) -> WritePageGuard {
-  auto t = std::this_thread::get_id();
-  uint32_t tid = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter FetchPageWrite with page_id = %uz", tid, page_id);
   auto ret = FetchPage(page_id);
   ret->WLatch();
   return {this, ret};
 }
 
 auto BufferPoolManager::NewPageGuarded(page_id_t *page_id) -> BasicPageGuard {
-  auto t = std::this_thread::get_id();
-  uint32_t tid = *reinterpret_cast<uint32_t *>(&t);
-  LOG_DEBUG("tid = %u, Enter NewPageGuarded", tid);
   return {this, NewPage(page_id)};
 }
 

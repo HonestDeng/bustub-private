@@ -14,7 +14,6 @@ class BasicPageGuard {
   BasicPageGuard() = default;
 
   BasicPageGuard(BufferPoolManager *bpm, Page *page) : bpm_(bpm), page_(page) {
-    LOG_DEBUG("Enter Constructor with this.pid = %d", page->GetPageId());
   }
 
   BasicPageGuard(const BasicPageGuard &) = delete;
@@ -96,19 +95,16 @@ class BasicPageGuard {
 
   template <class T>
   auto As() -> const T * {
-    LOG_DEBUG("Enter As with pid = %d", page_->GetPageId());
     return reinterpret_cast<const T *>(GetData());
   }
 
   auto GetDataMut() -> char * {
-    LOG_DEBUG("Enter GetDataMut with pid = %d", page_->GetPageId());
     is_dirty_ = true;
     return page_->GetData();
   }
 
   template <class T>
   auto AsMut() -> T * {
-    LOG_DEBUG("Enter AsMut with pid = %d", page_->GetPageId());
     return reinterpret_cast<T *>(GetDataMut());
   }
 
@@ -168,18 +164,15 @@ class ReadPageGuard {
   ~ReadPageGuard();
 
   auto PageId() -> page_id_t {
-    LOG_DEBUG("Enter PageID with pid = %d", guard_.page_->GetPageId());
     return guard_.PageId();
   }
 
   auto GetData() -> const char * {
-    LOG_DEBUG("Enter GetData with pid = %d", guard_.page_->GetPageId());
     return guard_.GetData();
   }
 
   template <class T>
   auto As() -> const T * {
-    LOG_DEBUG("Enter As with pid = %d", guard_.page_->GetPageId());
     return guard_.As<T>();
   }
 
@@ -240,18 +233,15 @@ class WritePageGuard {
 
   template <class T>
   auto As() -> const T * {
-    LOG_DEBUG("Enter As with pid = %d", guard_.page_->GetPageId());
     return guard_.As<T>();
   }
 
   auto GetDataMut() -> char * {
-    LOG_DEBUG("Enter GetDataMut with pid = %d", guard_.page_->GetPageId());
     return guard_.GetDataMut();
   }
 
   template <class T>
   auto AsMut() -> T * {
-    LOG_DEBUG("Enter AsMut with pid = %d", guard_.page_->GetPageId());
     return guard_.AsMut<T>();
   }
 

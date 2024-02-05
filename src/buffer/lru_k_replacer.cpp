@@ -17,7 +17,6 @@
 namespace bustub {
 
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_frames), k_(k) {
-  LOG_DEBUG("Create a Replacer: replacer_size = %zu, k = %zu", num_frames, k);
 }
 
 /*
@@ -26,7 +25,6 @@ LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_fra
  */
 auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
   latch_.lock();
-  LOG_DEBUG("Enter Evict");
   // 遍历每一个节点，寻找一个需要弹出的帧
   bool found = false;
   frame_id_t optimal_frame = -1;
@@ -66,21 +64,18 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
   }
 
   if (!found) {
-    LOG_DEBUG("Failed to evict");
     latch_.unlock();
     return false;
   }
   *frame_id = optimal_frame;
   node_store_.erase(optimal_frame);
   curr_size_--;
-  LOG_DEBUG("Evict frame %d", optimal_frame);
   latch_.unlock();
   return true;
 }
 
 void LRUKReplacer::RecordAccess(frame_id_t frame_id, AccessType access_type) {
   latch_.lock();
-  LOG_DEBUG("Enter RecordAccess: frame_id = %d", frame_id);
   BUSTUB_ASSERT(frame_id >= 0 && static_cast<unsigned long>(frame_id) < replacer_size_, "frame_id invalid");
 
   if (node_store_.count(frame_id) != 0) {
@@ -98,7 +93,6 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, AccessType access_type) {
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   latch_.lock();
-  LOG_DEBUG("Enter SetEvictable: frame_id = %d, set_evictable = %d", frame_id, set_evictable);
   BUSTUB_ASSERT(frame_id >= 0 && static_cast<unsigned long>(frame_id) < replacer_size_, "frame_id invalid");
   const auto node = node_store_.at(frame_id);
   if (node.IsEvictable() && !set_evictable) {
@@ -114,7 +108,6 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
 
 void LRUKReplacer::Remove(frame_id_t frame_id) {
   latch_.lock();
-  LOG_DEBUG("Enter Remove: frame_id = %d", frame_id);
   current_timestamp_++;
   if (node_store_.count(frame_id) == 0) {
     latch_.unlock();
@@ -127,7 +120,6 @@ void LRUKReplacer::Remove(frame_id_t frame_id) {
 }
 
 auto LRUKReplacer::Size() -> size_t {
-  LOG_DEBUG("Enter Size: size = %zu", curr_size_);
   return curr_size_;
 }
 

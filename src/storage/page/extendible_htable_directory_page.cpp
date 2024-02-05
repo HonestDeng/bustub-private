@@ -44,6 +44,13 @@ auto ExtendibleHTableDirectoryPage::GetSplitImageIndex(uint32_t bucket_idx) cons
   return bucket_idx ^ (1 << (local_depths_[bucket_idx]));  // 001的split image是101
 }
 
+auto ExtendibleHTableDirectoryPage::GetSplitImageIndexNoOver(uint32_t bucket_idx) const -> uint32_t {
+  if(local_depths_[bucket_idx] >= global_depth_ && global_depth_ > 0) {
+    return bucket_idx ^ (1 << (local_depths_[bucket_idx] - 1));  // 001的split image是101
+  }
+  return bucket_idx ^ (1 << (local_depths_[bucket_idx]));  // 001的split image是101
+}
+
 auto ExtendibleHTableDirectoryPage::GetGlobalDepth() const -> uint32_t { return global_depth_; }
 
 auto ExtendibleHTableDirectoryPage::GetMaxDepth() const -> uint32_t { return max_depth_; }
