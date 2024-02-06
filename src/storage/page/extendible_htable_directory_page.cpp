@@ -86,9 +86,7 @@ void ExtendibleHTableDirectoryPage::SetLocalDepth(uint32_t bucket_idx, uint8_t l
 }
 
 void ExtendibleHTableDirectoryPage::IncrLocalDepth(uint32_t bucket_idx) {
-  if (local_depths_[bucket_idx] >= global_depth_) {
-    IncrGlobalDepth();
-  }
+  // 调用时需要保证local_depths[bucket_idx] < global_depth
   local_depths_[bucket_idx]++;
 }
 

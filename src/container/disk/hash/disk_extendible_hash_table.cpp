@@ -29,12 +29,10 @@
 #include "storage/page/page_guard.h"
 
 namespace bustub {
-void Print(const RID x) {
-  std::cout << x << std::endl;
-}
+auto toString(const RID x) -> std::string { return x.ToString(); }
 
-void Print(const unsigned int x) {
-  std::cout << x << std::endl;
+auto toString(const unsigned int x) -> std::string {
+  return std::to_string(x);
 }
 template <typename K, typename V, typename KC>
 DiskExtendibleHashTable<K, V, KC>::DiskExtendibleHashTable(const std::string &name, BufferPoolManager *bpm,
@@ -47,8 +45,9 @@ DiskExtendibleHashTable<K, V, KC>::DiskExtendibleHashTable(const std::string &na
       header_max_depth_(header_max_depth),
       directory_max_depth_(directory_max_depth),
       bucket_max_size_(bucket_max_size) {
-  LOG_DEBUG("create a htable with buffer size = %zu, header_max_depth = %d, directory_max_depth = %d, bucket_max_size = %d",
-            bpm_->GetPoolSize(), header_max_depth, directory_max_depth, bucket_max_size);
+  LOG_DEBUG(
+      "create a htable with buffer size = %zu, header_max_depth = %d, directory_max_depth = %d, bucket_max_size = %d",
+      bpm_->GetPoolSize(), header_max_depth, directory_max_depth, bucket_max_size);
   header_page_id_ = INVALID_PAGE_ID;
   bpm_->NewPageGuarded(&header_page_id_);
   auto guard = bpm_->FetchPageWrite(header_page_id_);
@@ -94,8 +93,7 @@ auto DiskExtendibleHashTable<K, V, KC>::GetValue(const K &key, std::vector<V> *r
  *****************************************************************************/
 template <typename K, typename V, typename KC>
 auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Transaction *transaction) -> bool {
-  LOG_DEBUG("Enter Insert with key = %u, value = ", Hash(key));
-  Print(value);
+  LOG_DEBUG("Enter Insert with key = %u, value = %s", Hash(key), toString(value).c_str());
   // 一个问题是，如果key已经出现过了应该怎么办？是拒绝插入，还是覆盖原来的value？
   auto guard = bpm_->FetchPageWrite(header_page_id_);
   auto header_page = guard.template AsMut<ExtendibleHTableHeaderPage>();
@@ -122,7 +120,7 @@ auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Tra
 
   auto guard_bucket = bpm_->FetchPageWrite(bucket_page_id);
   auto bucket_page = guard_bucket.template AsMut<ExtendibleHTableBucketPage<K, V, KC>>();
-  if(bucket_page->IsExist(key, cmp_)) {
+  if (bucket_page->IsExist(key, cmp_)) {
     return false;
   }
   while (bucket_page->IsFull()) {
@@ -134,9 +132,6 @@ auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Tra
 
     // 如果这个bucket_page已经满了，则需要将这个page切分成两份
     auto image_idx = dir_page->GetSplitImageIndex(bucket_idx);
-    // 增加这两个互为镜像的page的depth
-    dir_page->IncrLocalDepth(bucket_idx);
-    dir_page->IncrLocalDepth(image_idx);
 
     // create a new bucket page
     page_id_t new_page_id;
@@ -144,7 +139,14 @@ auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Tra
     auto new_page_guard = bpm_->FetchPageWrite(new_page_id);
     auto bucket_image_page = new_page_guard.AsMut<ExtendibleHTableBucketPage<K, V, KC>>();
     bucket_image_page->Init(bucket_max_size_);
-    UpdateDirectoryMapping(dir_page, image_idx, new_page_id);
+
+    // 更新directory中的LD和bucket page id
+    auto local_depth = dir_page->GetLocalDepth(bucket_idx);
+    if (local_depth == dir_page->GetGlobalDepth()) {
+      // 调用UpdateDirectoryMapping之前保证GD大于image_idx的LD(也是bucket_idx的LD)
+      dir_page->IncrGlobalDepth();
+    }
+    UpdateDirectoryMapping(dir_page, image_idx, new_page_id, local_depth + 1);
 
     // 根据key将bucket_page中的一部分键值对迁移到bucket_image_page中
     MigrateEntries(bucket_page, bucket_image_page, image_idx, dir_page->GetLocalDepthMask(image_idx));
@@ -180,17 +182,36 @@ auto DiskExtendibleHashTable<K, V, KC>::InsertToNewBucket(ExtendibleHTableDirect
   page_id_t new_page_id;
   bpm_->NewPageGuarded(&new_page_id);
   // Don't forget to update meta-data
-  UpdateDirectoryMapping(directory, bucket_idx, new_page_id);
+  UpdateDirectoryMapping(directory, bucket_idx, new_page_id, 0);
+  directory->SetBucketPageId(bucket_idx, new_page_id);
+  directory->SetLocalDepth(bucket_idx, 0);
   auto bucket_guard = bpm_->FetchPageWrite(new_page_id);
   auto bucket_page = bucket_guard.AsMut<ExtendibleHTableBucketPage<K, V, KC>>();
   bucket_page->Init(bucket_max_size_);
   return bucket_page->Insert(key, value, cmp_);
 }
 
+//
+// 调用该函数前必须保证GD>=new_ld
 template <typename K, typename V, typename KC>
 void DiskExtendibleHashTable<K, V, KC>::UpdateDirectoryMapping(ExtendibleHTableDirectoryPage *directory,
-                                                               uint32_t new_bucket_idx, page_id_t new_bucket_page_id) {
-  directory->SetBucketPageId(new_bucket_idx, new_bucket_page_id);
+                                                               uint32_t new_bucket_idx, page_id_t new_bucket_page_id,
+                                                               uint32_t new_ld) {
+  auto gd = directory->GetGlobalDepth();                      // Global Depth
+  auto ld = directory->GetLocalDepth(new_bucket_idx);         // local depth
+  auto mask = directory->GetLocalDepthMask(new_bucket_idx);   // local depth mask
+  auto cur_idx = mask & new_bucket_idx;                       // current index
+  auto step = 1 << directory->GetLocalDepth(new_bucket_idx);  // step size
+  auto cnt = 1 << (gd - ld);                                  // how many entries to update
+  bool update_id = false;
+  while ((cnt--) != 0) {
+    directory->SetLocalDepth(cur_idx, new_ld);
+    if (update_id) {
+      directory->SetBucketPageId(cur_idx, new_bucket_page_id);
+    }
+    cur_idx += step;
+    update_id = !update_id;
+  }
 }
 
 template <typename K, typename V, typename KC>
@@ -247,7 +268,7 @@ auto DiskExtendibleHashTable<K, V, KC>::Remove(const K &key, Transaction *transa
   while (dir_page->GetLocalDepth(bucket_idx) > 0) {
     auto split_idx = dir_page->GetSplitImageIndexNoOver(bucket_idx);
     auto split_page_id = dir_page->GetBucketPageId(split_idx);
-    if(split_page_id == bucket_page_id) {
+    if (split_page_id == bucket_page_id) {
       // 如果这两个是同一个page，则不需要合并
       break;
     }
@@ -269,24 +290,24 @@ auto DiskExtendibleHashTable<K, V, KC>::Remove(const K &key, Transaction *transa
 
     // merge page and delete the old page
     if (source_idx == bucket_idx) {
-      MigrateEntries(bucket_page, split_page,
-                     merge_idx, dir_page->GetLocalDepthMask(bucket_idx));
+      MigrateEntries(bucket_page, split_page, merge_idx, dir_page->GetLocalDepthMask(bucket_idx));
       guard_bucket = std::move(split_guard);
-      bucket_page = guard_bucket.template AsMut<ExtendibleHTableBucketPage<K,V,KC>>();
+      bucket_page = guard_bucket.template AsMut<ExtendibleHTableBucketPage<K, V, KC>>();
       bucket_page_id = split_page_id;
       bucket_idx = split_idx;
-      UpdateDirectoryMapping(dir_page, source_idx, split_page_id);
+      auto ld = dir_page->GetLocalDepth(source_idx);
+      UpdateDirectoryMapping(dir_page, source_idx, split_page_id, ld);
       bpm_->DeletePage(bucket_page_id);
-    }else{
-      MigrateEntries(split_page, bucket_page,
-                     merge_idx, dir_page->GetLocalDepthMask(bucket_idx));
-      UpdateDirectoryMapping(dir_page, source_idx, bucket_page_id);
+    } else {
+      MigrateEntries(split_page, bucket_page, merge_idx, dir_page->GetLocalDepthMask(bucket_idx));
+      auto ld = dir_page->GetLocalDepth(source_idx);
+      UpdateDirectoryMapping(dir_page, source_idx, bucket_page_id, ld);
       bpm_->DeletePage(bucket_page_id);
     }
   }
 
   // 检查directory是否可以收缩
-  if(!dir_page->CanShrink()) {
+  if (!dir_page->CanShrink()) {
     return ret;
   }
   // 收缩directory

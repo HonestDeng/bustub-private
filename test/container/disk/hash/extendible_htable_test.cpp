@@ -136,6 +136,7 @@ TEST(ExtendibleHTableTest, RemoveTest1) {
   // remove the keys we inserted
   for (int i = 0; i < num_keys; i++) {
     bool removed = ht.Remove(i);
+    ht.VerifyIntegrity();
     ASSERT_TRUE(removed);
     std::vector<int> res;
     ht.GetValue(i, &res);
