@@ -117,18 +117,18 @@ class DiskExtendibleHashTable {
       -> bool;
 
 
-  /**
-   * 更新directory中的LD和page id。
-   * 假设new_bucket_idx指向B，设所有指向桶B的entries的集合为E。
-   * 对于E中的每一个entry，我们更新它LD为new_ld。
-   * 让具有相同的new_ld & bucket_idx的entry指向相同的bucket_page。
-   * @param directory
-   * @param new_bucket_idx
-   * @param new_bucket_page_id
-   * @param new_ld
-   */
-  void UpdateDirectoryMapping(ExtendibleHTableDirectoryPage *directory, uint32_t new_bucket_idx,
-                              page_id_t new_bucket_page_id, uint32_t new_ld);
+//  /**
+//   * 更新directory中的LD和page id。
+//   * 假设new_bucket_idx指向B，设所有指向桶B的entries的集合为E。
+//   * 对于E中的每一个entry，我们更新它LD为new_ld。
+//   * 让具有相同的new_ld & bucket_idx的entry指向相同的bucket_page。
+//   * @param directory
+//   * @param new_bucket_idx
+//   * @param new_bucket_page_id
+//   * @param new_ld
+//   */
+//  void UpdateDirectoryMapping(ExtendibleHTableDirectoryPage *directory, uint32_t new_bucket_idx,
+//                              page_id_t new_bucket_page_id, uint32_t new_ld);
 
   void MigrateEntries(ExtendibleHTableBucketPage<K, V, KC> *old_bucket,
                       ExtendibleHTableBucketPage<K, V, KC> *new_bucket, uint32_t new_bucket_idx,

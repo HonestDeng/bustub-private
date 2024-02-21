@@ -142,19 +142,42 @@ auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Tra
     auto bucket_image_page = new_page_guard.AsMut<ExtendibleHTableBucketPage<K, V, KC>>();
     bucket_image_page->Init(bucket_max_size_);
 
-    // 更新directory中的LD和bucket page id
+    // 更新directory中的LD和bucket_page_id
     auto local_depth = dir_page->GetLocalDepth(bucket_idx);
     if (local_depth == dir_page->GetGlobalDepth()) {
       // 调用UpdateDirectoryMapping之前保证GD大于image_idx的LD(也是bucket_idx的LD)
       dir_page->IncrGlobalDepth();
     }
-    UpdateDirectoryMapping(dir_page, image_idx, new_page_id, local_depth + 1);
+    // 注意：此时directory会有2^(GD-LD)个entry指向bucket_page。所有指向bucket_page的entry的LD和bucket_page_id都需要更新
+    std::vector<uint32_t> bucket_idxes;  // 存储所有需要修改的entry的idx
+    auto ld_mask = dir_page->GetLocalDepthMask(image_idx);
+    for (uint32_t i = 0; i < (1 << dir_page->GetGlobalDepth()); i++) {
+      // 可以证明，肯有ld_mask & image_idx == ld_mask & bucket_idx
+      if ((ld_mask & i) == (ld_mask & image_idx)) {
+        bucket_idxes.push_back(i);
+      }
+    }
+    // 先更新LD
+    // 实际上，image_idx和bucket_idx的local_depth_mask应该是相同的
+    for (const auto &i : bucket_idxes) {
+      // 可以证明，肯有ld_mask & image_idx == ld_mask & bucket_idx
+      dir_page->IncrLocalDepth(i);
+    }
+    // 再更新bucket_page_id
+    bool do_update = false;
+    for (const auto &i : bucket_idxes) {
+      if (do_update) {
+        dir_page->SetBucketPageId(i, new_page_id);
+      }
+      do_update = !do_update;
+    }
 
     // 根据key将bucket_page中的一部分键值对迁移到bucket_image_page中
     MigrateEntries(bucket_page, bucket_image_page, image_idx, dir_page->GetLocalDepthMask(image_idx));
 
-    // 如果hash与新生成的page的idx对应
-    if ((hash & dir_page->GetLocalDepthMask(image_idx)) == image_idx) {
+    // 如果键值对要插入的bucket是bucket_image_page
+    ld_mask = dir_page->GetLocalDepthMask(image_idx);
+    if ((hash & ld_mask) == (image_idx & ld_mask)) {
       bucket_page = bucket_image_page;
     }
   }
@@ -184,7 +207,6 @@ auto DiskExtendibleHashTable<K, V, KC>::InsertToNewBucket(ExtendibleHTableDirect
   page_id_t new_page_id;
   bpm_->NewPageGuarded(&new_page_id);
   // Don't forget to update meta-data
-  UpdateDirectoryMapping(directory, bucket_idx, new_page_id, 0);
   directory->SetBucketPageId(bucket_idx, new_page_id);
   directory->SetLocalDepth(bucket_idx, 0);
   auto bucket_guard = bpm_->FetchPageWrite(new_page_id);
@@ -195,29 +217,29 @@ auto DiskExtendibleHashTable<K, V, KC>::InsertToNewBucket(ExtendibleHTableDirect
 
 //
 // 调用该函数前必须保证GD>=new_ld
-template <typename K, typename V, typename KC>
-void DiskExtendibleHashTable<K, V, KC>::UpdateDirectoryMapping(ExtendibleHTableDirectoryPage *directory,
-                                                               uint32_t new_bucket_idx, page_id_t new_bucket_page_id,
-                                                               uint32_t new_ld) {
-  auto gd = directory->GetGlobalDepth();                      // Global Depth
-  auto ld = directory->GetLocalDepth(new_bucket_idx);         // local depth
-  auto mask = directory->GetLocalDepthMask(new_bucket_idx);   // local depth mask
-  auto cur_idx = mask & new_bucket_idx;                       // current index
-  auto step = 1 << directory->GetLocalDepth(new_bucket_idx);  // step size
-  auto cnt = 1 << (gd - ld);                                  // how many entries to update
-  bool update_id = false;
-  LOG_DEBUG("ld = %d, mask = %d, step = %d, cnt = %d", ld, mask, step, cnt);
-  while ((cnt--) != 0) {
-    LOG_DEBUG("Update local depth at %d to %d", cur_idx, new_ld);
-    directory->SetLocalDepth(cur_idx, new_ld);
-    if (update_id) {
-      LOG_DEBUG("Update page id at %d to %d", cur_idx, new_bucket_page_id);
-      directory->SetBucketPageId(cur_idx, new_bucket_page_id);
-    }
-    cur_idx += step;
-    update_id = !update_id;
-  }
-}
+//template <typename K, typename V, typename KC>
+//void DiskExtendibleHashTable<K, V, KC>::UpdateDirectoryMapping(ExtendibleHTableDirectoryPage *directory,
+//                                                               uint32_t new_bucket_idx, page_id_t new_bucket_page_id,
+//                                                               uint32_t new_ld) {
+//  auto gd = directory->GetGlobalDepth();                      // Global Depth
+//  auto ld = directory->GetLocalDepth(new_bucket_idx);         // local depth
+//  auto mask = directory->GetLocalDepthMask(new_bucket_idx);   // local depth mask
+//  auto cur_idx = mask & new_bucket_idx;                       // current index
+//  auto step = 1 << directory->GetLocalDepth(new_bucket_idx);  // step size
+//  auto cnt = 1 << (gd - ld);                                  // how many entries to update
+//  bool update_id = false;
+//  LOG_DEBUG("ld = %d, mask = %d, step = %d, cnt = %d", ld, mask, step, cnt);
+//  while ((cnt--) != 0) {
+//    LOG_DEBUG("Update local depth at %d to %d", cur_idx, new_ld);
+//    directory->SetLocalDepth(cur_idx, new_ld);
+//    if (update_id) {
+//      LOG_DEBUG("Update page id at %d to %d", cur_idx, new_bucket_page_id);
+//      directory->SetBucketPageId(cur_idx, new_bucket_page_id);
+//    }
+//    cur_idx += step;
+//    update_id = !update_id;
+//  }
+//}
 
 template <typename K, typename V, typename KC>
 void DiskExtendibleHashTable<K, V, KC>::MigrateEntries(ExtendibleHTableBucketPage<K, V, KC> *old_bucket,
@@ -264,9 +286,7 @@ auto DiskExtendibleHashTable<K, V, KC>::Remove(const K &key, Transaction *transa
   LOG_DEBUG("directory page id = %u", dir_page_id);
   auto guard_bucket = bpm_->FetchPageWrite(bucket_page_id);
   auto bucket_page = guard_bucket.template AsMut<ExtendibleHTableBucketPage<K, V, KC>>();
-  if (dir_page_id == 7) {
-    dir_page->PrintDirectory1(dir_page_id, bpm_);
-  }
+
   auto ret = bucket_page->Remove(key, cmp_);
   if (!ret) {
     return ret;
@@ -306,10 +326,6 @@ auto DiskExtendibleHashTable<K, V, KC>::Remove(const K &key, Transaction *transa
     if (dir_page->CanShrink()) {
       dir_page->DecrGlobalDepth();
     }
-  }
-
-  if (dir_page_id == 7) {
-    dir_page->PrintDirectory1(dir_page_id, bpm_);
   }
 
   return ret;

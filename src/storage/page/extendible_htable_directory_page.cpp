@@ -42,6 +42,7 @@ void ExtendibleHTableDirectoryPage::SetBucketPageId(uint32_t bucket_idx, page_id
   bucket_page_ids_[bucket_idx] = bucket_page_id;
 }
 
+// split_image_index的定义是bucket_idx指向的bucket分裂之后指向新bucket的entry的idx
 auto ExtendibleHTableDirectoryPage::GetSplitImageIndex(uint32_t bucket_idx) const -> uint32_t {
   return bucket_idx ^ (1 << (local_depths_[bucket_idx]));  // 001的split image是101
 }
@@ -54,7 +55,6 @@ auto ExtendibleHTableDirectoryPage::GetSplitImageIndexNoOver(uint32_t bucket_idx
 }
 
 auto ExtendibleHTableDirectoryPage::GetGlobalDepth() const -> uint32_t {
-  PrintDirectory();
   return global_depth_;
 }
 

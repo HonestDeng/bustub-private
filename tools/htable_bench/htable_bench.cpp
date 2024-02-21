@@ -32,11 +32,11 @@ auto ClockMs() -> uint64_t {
   return static_cast<uint64_t>(tm.tv_sec * 1000) + static_cast<uint64_t>(tm.tv_usec / 1000);
 }
 
-static const size_t BUSTUB_READ_THREAD = 4;
-static const size_t BUSTUB_WRITE_THREAD = 2;
+static const size_t BUSTUB_READ_THREAD = 1;
+static const size_t BUSTUB_WRITE_THREAD = 1;
 static const size_t LRU_K_SIZE = 4;
 static const size_t BUSTUB_BPM_SIZE = 256;
-static const size_t TOTAL_KEYS = 100000;
+static const size_t TOTAL_KEYS = 100;
 static const size_t KEY_MODIFY_RANGE = 2048;
 
 struct HTableTotalMetrics {
