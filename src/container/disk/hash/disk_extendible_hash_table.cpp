@@ -95,7 +95,7 @@ auto DiskExtendibleHashTable<K, V, KC>::GetValue(const K &key, std::vector<V> *r
  *****************************************************************************/
 template <typename K, typename V, typename KC>
 auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Transaction *transaction) -> bool {
-  LOG_DEBUG("Enter Insert with key = %u, value = %s", Hash(key), toString(value).c_str());
+//  LOG_DEBUG("Enter Insert with key = %u, value = %s", Hash(key), toString(value).c_str());
   // 一个问题是，如果key已经出现过了应该怎么办？是拒绝插入，还是覆盖原来的value？
   auto guard = bpm_->FetchPageWrite(header_page_id_);
   auto header_page = guard.template AsMut<ExtendibleHTableHeaderPage>();
@@ -215,32 +215,6 @@ auto DiskExtendibleHashTable<K, V, KC>::InsertToNewBucket(ExtendibleHTableDirect
   return bucket_page->Insert(key, value, cmp_);
 }
 
-//
-// 调用该函数前必须保证GD>=new_ld
-//template <typename K, typename V, typename KC>
-//void DiskExtendibleHashTable<K, V, KC>::UpdateDirectoryMapping(ExtendibleHTableDirectoryPage *directory,
-//                                                               uint32_t new_bucket_idx, page_id_t new_bucket_page_id,
-//                                                               uint32_t new_ld) {
-//  auto gd = directory->GetGlobalDepth();                      // Global Depth
-//  auto ld = directory->GetLocalDepth(new_bucket_idx);         // local depth
-//  auto mask = directory->GetLocalDepthMask(new_bucket_idx);   // local depth mask
-//  auto cur_idx = mask & new_bucket_idx;                       // current index
-//  auto step = 1 << directory->GetLocalDepth(new_bucket_idx);  // step size
-//  auto cnt = 1 << (gd - ld);                                  // how many entries to update
-//  bool update_id = false;
-//  LOG_DEBUG("ld = %d, mask = %d, step = %d, cnt = %d", ld, mask, step, cnt);
-//  while ((cnt--) != 0) {
-//    LOG_DEBUG("Update local depth at %d to %d", cur_idx, new_ld);
-//    directory->SetLocalDepth(cur_idx, new_ld);
-//    if (update_id) {
-//      LOG_DEBUG("Update page id at %d to %d", cur_idx, new_bucket_page_id);
-//      directory->SetBucketPageId(cur_idx, new_bucket_page_id);
-//    }
-//    cur_idx += step;
-//    update_id = !update_id;
-//  }
-//}
-
 template <typename K, typename V, typename KC>
 void DiskExtendibleHashTable<K, V, KC>::MigrateEntries(ExtendibleHTableBucketPage<K, V, KC> *old_bucket,
                                                        ExtendibleHTableBucketPage<K, V, KC> *new_bucket,
@@ -262,7 +236,7 @@ void DiskExtendibleHashTable<K, V, KC>::MigrateEntries(ExtendibleHTableBucketPag
  *****************************************************************************/
 template <typename K, typename V, typename KC>
 auto DiskExtendibleHashTable<K, V, KC>::Remove(const K &key, Transaction *transaction) -> bool {
-  LOG_DEBUG("Enter Remove with key = %x", Hash(key));
+//  LOG_DEBUG("Enter Remove with key = %x", Hash(key));
   auto guard = bpm_->FetchPageWrite(header_page_id_);
   auto header_page = guard.template AsMut<ExtendibleHTableHeaderPage>();
   header_page->Init(header_max_depth_);
@@ -292,34 +266,59 @@ auto DiskExtendibleHashTable<K, V, KC>::Remove(const K &key, Transaction *transa
     return ret;
   }
 
+  // 合并的时候需要注意下面的易错点：
+  // 1. "合并"这个动词的主语应该是两个bucket page。在directory中，可能会有多个entry指向同一个bucket_page。
+  // 假设需要合并bucket1和bucket2，有entry1和entry2指向bucket1，entry3和entry4指向bucket2。那么假设在合并bucket1和bucket2之后的
+  // bucket为bucket_merge，entry1、entry2、entry3和entry4都要指向bucket_merge。
+  // 2.
+  // 需要进行递归地合并。比如说，bucket1和bucket2合并之后得到bucket_merge。而bucket_merge为空，那么bucket_merge仍然需要与bucket3
+  // 进行合并。
+  // 3. 在合并时只有merge_idx，没有split_idx
+
   // 删除成功，接下来考虑能不能合并一些bucket
   auto bucket_idx = dir_page->HashToBucketIndex(hash);
   while (dir_page->GetLocalDepth(bucket_idx) > 0) {
-    auto split_idx = dir_page->GetSplitImageIndexNoOver(bucket_idx);
-    auto split_page_id = dir_page->GetBucketPageId(split_idx);
-    if (split_page_id == bucket_page_id) {
+    auto merge_idx = dir_page->GetMergeImageIndex(bucket_idx);
+    auto merge_page_id = dir_page->GetBucketPageId(merge_idx);
+    if (merge_page_id == bucket_page_id) {
       // 如果这两个是同一个page，则不需要合并
       break;
     }
-    auto split_guard = bpm_->FetchPageWrite(split_page_id);
-    auto split_page = split_guard.template AsMut<ExtendibleHTableBucketPage<K, V, KC>>();
-    if (!bucket_page->IsEmpty() && !split_page->IsEmpty()) {
+    auto merge_guard = bpm_->FetchPageWrite(merge_page_id);
+    auto merge_page = merge_guard.template AsMut<ExtendibleHTableBucketPage<K, V, KC>>();
+    if (!bucket_page->IsEmpty() && !merge_page->IsEmpty()) {
       // 如果两个bucket都不为空，那么就无法合并，直接退出函数
       break;
     }
-    if (dir_page->GetLocalDepth(bucket_idx) != dir_page->GetLocalDepth(split_idx)) {
+    if (dir_page->GetLocalDepth(bucket_idx) != dir_page->GetLocalDepth(merge_idx)) {
       // 如果两个bucket的深度不相同，那也无法合并
+      // 一般来说应该不会发生这种情况吧。。。
       break;
     }
 
-    // 统一把split_image_bucket中的数据迁移到bucket_page中
-    dir_page->DecrLocalDepth(bucket_idx);
-    dir_page->DecrLocalDepth(split_idx);
-    MigrateEntries(split_page, bucket_page, bucket_idx, dir_page->GetLocalDepthMask(bucket_idx));
-    dir_page->SetBucketPageId(split_idx, bucket_page_id);
+    // 收集所有需要更新的entry的idx
+    std::vector<uint32_t> bucket_idxes;
+    auto ld_mask1 = dir_page->GetLocalDepthMask(bucket_idx);
+    auto ld_mask2 = dir_page->GetLocalDepthMask(merge_idx);
+    for (uint32_t i = 0; i < (1 << dir_page->GetGlobalDepth()); i++) {
+      // 可以证明，肯有ld_mask & image_idx == ld_mask & bucket_idx
+      if ((ld_mask1 & i) == (ld_mask1 & bucket_idx)) {
+        bucket_idxes.push_back(i);
+      }
+      if ((ld_mask2 & i) == (ld_mask2 & merge_idx)) {
+        bucket_idxes.push_back(i);
+      }
+    }
+    // 更新LD和bucket_page_id
+    for(const auto&i:bucket_idxes) {
+      dir_page->SetBucketPageId(i, bucket_page_id);
+      dir_page->DecrLocalDepth(i);
+    }
+    // 将merge_page中的数据钱已到bucket_page中
+    MigrateEntries(merge_page, bucket_page, bucket_idx, dir_page->GetLocalDepthMask(bucket_idx));
 
-    if (split_idx < bucket_idx) {
-      bucket_idx = split_idx;
+    if (merge_idx < bucket_idx) {
+      bucket_idx = merge_idx;
     }
 
     // 检查directory是否可以收缩

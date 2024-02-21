@@ -19,7 +19,10 @@ namespace bustub {
 void ExtendibleHTableHeaderPage::Init(uint32_t max_depth) { this->max_depth_ = max_depth; }
 
 auto ExtendibleHTableHeaderPage::HashToDirectoryIndex(uint32_t hash) const -> uint32_t {
-  auto index = hash >> 30;
+  if (max_depth_ == 0) {
+    return 0;
+  }
+  auto index = hash >> (sizeof(hash) * 8 - max_depth_);
   return index;
 }
 

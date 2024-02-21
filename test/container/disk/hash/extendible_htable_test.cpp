@@ -237,7 +237,7 @@ TEST(ExtendibleHTableTest, InsertNonUniqueKeyTest) {
 }
 
 
-TEST(ExtendibleHTableTest, MergeTest) {
+TEST(ExtendibleHTableTest, MergeTest1) {
   auto disk_mgr = std::make_unique<DiskManagerUnlimitedMemory>();
   auto bpm = std::make_unique<BufferPoolManager>(50, disk_mgr.get());
 
@@ -258,6 +258,30 @@ TEST(ExtendibleHTableTest, MergeTest) {
   auto directory_guard = bpm->FetchPageBasic(1);
   auto directory = directory_guard.template As<ExtendibleHTableDirectoryPage>();
 
+  ASSERT_EQ(0, directory->GetGlobalDepth());
+}
+
+TEST(ExtendibleHTableTest, MergeTest2) {
+  auto disk_mgr = std::make_unique<DiskManagerUnlimitedMemory>();
+  auto bpm = std::make_unique<BufferPoolManager>(50, disk_mgr.get());
+
+  DiskExtendibleHashTable<int, int, IntComparator> ht("blah", bpm.get(), IntComparator(), HashFunction<int>(), 1, 2, 2);
+
+  ht.Insert(0, 0);
+  ht.Insert(1, 0);
+  ht.Insert(2, 0);
+  ht.Insert(4, 0);
+
+  auto directory_guard = bpm->FetchPageBasic(1);
+  auto directory = directory_guard.template As<ExtendibleHTableDirectoryPage>();
+
+  ASSERT_EQ(true, ht.Remove(1));
+  ASSERT_EQ(2, directory->GetGlobalDepth());
+  ASSERT_EQ(true, ht.Remove(4));
+  ASSERT_EQ(2, directory->GetGlobalDepth());
+  ASSERT_EQ(true, ht.Remove(0));
+  ASSERT_EQ(0, directory->GetGlobalDepth());
+  ASSERT_EQ(true, ht.Remove(2));
   ASSERT_EQ(0, directory->GetGlobalDepth());
 }
 
