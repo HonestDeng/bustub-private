@@ -67,7 +67,7 @@ class ExtendibleHTableBucketPage {
    * @return true if the key and value are present, false if not found.
    */
   auto Lookup(const KeyType &key, ValueType &value, const KeyComparator &cmp) const -> bool;
-  auto IsExist(const KeyType& key, const KeyComparator) const -> bool;
+  auto IsExist(const KeyType &key, KeyComparator cmp) const -> bool;
 
   /**
    * Attempts to insert a key and value in the bucket.

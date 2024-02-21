@@ -36,7 +36,7 @@ auto ExtendibleHTableBucketPage<K, V, KC>::Lookup(const K &key, V &value, const 
 }
 
 template <typename K, typename V, typename KC>
-auto ExtendibleHTableBucketPage<K, V, KC>::IsExist(const K& key, const KC cmp) const -> bool {
+auto ExtendibleHTableBucketPage<K, V, KC>::IsExist(const K &key, const KC cmp) const -> bool {
   for (uint32_t i = 0; i < size_; i++) {
     const auto &item = array_[i];
     if (!cmp(item.first, key) && !cmp(key, item.first)) {

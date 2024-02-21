@@ -16,8 +16,7 @@
 
 namespace bustub {
 
-LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_frames), k_(k) {
-}
+LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_frames), k_(k) {}
 
 /*
  * 如果有 k = 3, 并且访问记录为 1 2 3 4 1 2 3 1 2
@@ -119,8 +118,6 @@ void LRUKReplacer::Remove(frame_id_t frame_id) {
   latch_.unlock();
 }
 
-auto LRUKReplacer::Size() -> size_t {
-  return curr_size_;
-}
+auto LRUKReplacer::Size() -> size_t { return curr_size_; }
 
 }  // namespace bustub

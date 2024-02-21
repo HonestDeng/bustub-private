@@ -188,15 +188,14 @@ TEST(ExtendibleHTableTest, RemoveTest2) {
     ASSERT_EQ(i, res[0]);
   }
   ht.VerifyIntegrity();
-
 }
-
 
 TEST(ExtendibleHTableTest, LargeInsertTest1) {
   auto disk_mgr = std::make_unique<DiskManagerUnlimitedMemory>();
   auto bpm = std::make_unique<BufferPoolManager>(10, disk_mgr.get());
 
-  DiskExtendibleHashTable<int, int, IntComparator> ht("blah", bpm.get(), IntComparator(), HashFunction<int>(), 0, 5, 10);
+  DiskExtendibleHashTable<int, int, IntComparator> ht("blah", bpm.get(), IntComparator(), HashFunction<int>(), 0, 5,
+                                                      10);
 
   int num_keys = 320;
 
@@ -236,7 +235,6 @@ TEST(ExtendibleHTableTest, InsertNonUniqueKeyTest) {
   ASSERT_FALSE(ht.Insert(1, 1));
 }
 
-
 TEST(ExtendibleHTableTest, MergeTest1) {
   auto disk_mgr = std::make_unique<DiskManagerUnlimitedMemory>();
   auto bpm = std::make_unique<BufferPoolManager>(50, disk_mgr.get());
@@ -249,7 +247,7 @@ TEST(ExtendibleHTableTest, MergeTest1) {
   ht.Insert(14, 0);
 
   auto bucket_guard = bpm->FetchPageBasic(4);
-  auto bucket_page = bucket_guard.template As<ExtendibleHTableBucketPage<int,int,IntComparator>>();
+  auto bucket_page = bucket_guard.template As<ExtendibleHTableBucketPage<int, int, IntComparator>>();
   std::cout << bucket_page->Size();
   ASSERT_EQ(true, ht.Remove(5));
   ASSERT_EQ(true, ht.Remove(14));
@@ -285,13 +283,12 @@ TEST(ExtendibleHTableTest, MergeTest2) {
   ASSERT_EQ(0, directory->GetGlobalDepth());
 }
 
-
 TEST(ExtendibleHTableTest, SplitGrowTest) {
   auto disk_mgr = std::make_unique<DiskManagerUnlimitedMemory>();
   auto bpm = std::make_unique<BufferPoolManager>(4, disk_mgr.get());
 
-  DiskExtendibleHashTable<int, int, IntComparator> ht("blah", bpm.get(), IntComparator(), HashFunction<int>(), 9, 9, 511);
-
+  DiskExtendibleHashTable<int, int, IntComparator> ht("blah", bpm.get(), IntComparator(), HashFunction<int>(), 9, 9,
+                                                      511);
 }
 
 }  // namespace bustub

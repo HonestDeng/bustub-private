@@ -193,6 +193,7 @@ class ExtendibleHTableDirectoryPage {
   void PrintDirectory() const;
   void PrintDirectory1(uint page_id_, BufferPoolManager *bpm);
   static int page_id;
+
  private:
   uint32_t max_depth_;
   uint32_t global_depth_;

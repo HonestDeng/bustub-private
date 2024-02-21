@@ -29,9 +29,10 @@
 #include "storage/page/page_guard.h"
 
 namespace bustub {
-auto toString(const RID x) -> std::string { return x.ToString(); }
+auto ToString(const RID x) -> std::string { return x.ToString(); }
 
-auto toString(const unsigned int x) -> std::string { return std::to_string(x); }
+auto ToString(const unsigned int x) -> std::string { return std::to_string(x); }
+
 template <typename K, typename V, typename KC>
 DiskExtendibleHashTable<K, V, KC>::DiskExtendibleHashTable(const std::string &name, BufferPoolManager *bpm,
                                                            const KC &cmp, const HashFunction<K> &hash_fn,
@@ -95,7 +96,7 @@ auto DiskExtendibleHashTable<K, V, KC>::GetValue(const K &key, std::vector<V> *r
  *****************************************************************************/
 template <typename K, typename V, typename KC>
 auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Transaction *transaction) -> bool {
-//  LOG_DEBUG("Enter Insert with key = %u, value = %s", Hash(key), toString(value).c_str());
+  //  LOG_DEBUG("Enter Insert with key = %u, value = %s", Hash(key), toString(value).c_str());
   // 一个问题是，如果key已经出现过了应该怎么办？是拒绝插入，还是覆盖原来的value？
   auto guard = bpm_->FetchPageWrite(header_page_id_);
   auto header_page = guard.template AsMut<ExtendibleHTableHeaderPage>();
@@ -236,7 +237,7 @@ void DiskExtendibleHashTable<K, V, KC>::MigrateEntries(ExtendibleHTableBucketPag
  *****************************************************************************/
 template <typename K, typename V, typename KC>
 auto DiskExtendibleHashTable<K, V, KC>::Remove(const K &key, Transaction *transaction) -> bool {
-//  LOG_DEBUG("Enter Remove with key = %x", Hash(key));
+  //  LOG_DEBUG("Enter Remove with key = %x", Hash(key));
   auto guard = bpm_->FetchPageWrite(header_page_id_);
   auto header_page = guard.template AsMut<ExtendibleHTableHeaderPage>();
   header_page->Init(header_max_depth_);
@@ -310,7 +311,7 @@ auto DiskExtendibleHashTable<K, V, KC>::Remove(const K &key, Transaction *transa
       }
     }
     // 更新LD和bucket_page_id
-    for(const auto&i:bucket_idxes) {
+    for (const auto &i : bucket_idxes) {
       dir_page->SetBucketPageId(i, bucket_page_id);
       dir_page->DecrLocalDepth(i);
     }

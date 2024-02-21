@@ -23,12 +23,12 @@
 #include <utility>
 #include <vector>
 
+#include <cassert>
 #include "common/config.h"
 #include "common/exception.h"
 #include "common/logger.h"
 #include "fmt/core.h"
 #include "storage/disk/disk_manager.h"
-#include <cassert>
 
 namespace bustub {
 

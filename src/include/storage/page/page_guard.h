@@ -13,8 +13,7 @@ class BasicPageGuard {
  public:
   BasicPageGuard() = default;
 
-  BasicPageGuard(BufferPoolManager *bpm, Page *page) : bpm_(bpm), page_(page) {
-  }
+  BasicPageGuard(BufferPoolManager *bpm, Page *page) : bpm_(bpm), page_(page) {}
 
   BasicPageGuard(const BasicPageGuard &) = delete;
   auto operator=(const BasicPageGuard &) -> BasicPageGuard & = delete;
@@ -85,13 +84,9 @@ class BasicPageGuard {
    */
   auto UpgradeWrite() -> WritePageGuard;
 
-  auto PageId() -> page_id_t {
-    return page_->GetPageId();
-  }
+  auto PageId() -> page_id_t { return page_->GetPageId(); }
 
-  auto GetData() -> const char * {
-    return page_->GetData();
-  }
+  auto GetData() -> const char * { return page_->GetData(); }
 
   template <class T>
   auto As() -> const T * {
@@ -163,13 +158,9 @@ class ReadPageGuard {
    */
   ~ReadPageGuard();
 
-  auto PageId() -> page_id_t {
-    return guard_.PageId();
-  }
+  auto PageId() -> page_id_t { return guard_.PageId(); }
 
-  auto GetData() -> const char * {
-    return guard_.GetData();
-  }
+  auto GetData() -> const char * { return guard_.GetData(); }
 
   template <class T>
   auto As() -> const T * {
@@ -236,9 +227,7 @@ class WritePageGuard {
     return guard_.As<T>();
   }
 
-  auto GetDataMut() -> char * {
-    return guard_.GetDataMut();
-  }
+  auto GetDataMut() -> char * { return guard_.GetDataMut(); }
 
   template <class T>
   auto AsMut() -> T * {

@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "storage/page/extendible_htable_directory_page.h"
-#include "storage/page/extendible_htable_bucket_page.h"
 #include <algorithm>
 #include <unordered_map>
+#include "storage/page/extendible_htable_bucket_page.h"
 
 #include "common/config.h"
 #include "common/logger.h"
@@ -48,15 +48,13 @@ auto ExtendibleHTableDirectoryPage::GetSplitImageIndex(uint32_t bucket_idx) cons
 }
 
 auto ExtendibleHTableDirectoryPage::GetMergeImageIndex(uint32_t bucket_idx) const -> uint32_t {
-  if(local_depths_[bucket_idx] >= global_depth_ && global_depth_ > 0) {
+  if (local_depths_[bucket_idx] >= global_depth_ && global_depth_ > 0) {
     return bucket_idx ^ (1 << (local_depths_[bucket_idx] - 1));  // 001的split image是101
   }
   return bucket_idx ^ (1 << (local_depths_[bucket_idx]));  // 001的split image是101
 }
 
-auto ExtendibleHTableDirectoryPage::GetGlobalDepth() const -> uint32_t {
-  return global_depth_;
-}
+auto ExtendibleHTableDirectoryPage::GetGlobalDepth() const -> uint32_t { return global_depth_; }
 
 auto ExtendibleHTableDirectoryPage::GetMaxDepth() const -> uint32_t { return max_depth_; }
 
@@ -111,16 +109,16 @@ void ExtendibleHTableDirectoryPage::PrintDirectory1(uint page_id_, BufferPoolMan
   for (uint32_t idx = 0; idx < static_cast<uint32_t>(0x1 << global_depth_); idx++) {
     auto bucket_guard = bpm->FetchPageBasic(bucket_page_ids_[idx]);
     auto bucket = bucket_guard.template As<ExtendibleHTableBucketPage<int, int, IntComparator>>();
-    if(bucket->Size() > 0) {
+    if (bucket->Size() > 0) {
       do_exit = false;
     }
-    LOG_DEBUG("|    %u    |    %u    |    %u    |    %u    |", idx, bucket_page_ids_[idx], local_depths_[idx], bucket->Size());
+    LOG_DEBUG("|    %u    |    %u    |    %u    |    %u    |", idx, bucket_page_ids_[idx], local_depths_[idx],
+              bucket->Size());
   }
   LOG_DEBUG("================ END DIRECTORY ================");
-  if(do_exit && global_depth_ > 0) {
+  if (do_exit && global_depth_ > 0) {
     exit(111);
   }
 }
-
 
 }  // namespace bustub
