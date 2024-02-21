@@ -70,6 +70,7 @@ auto DiskExtendibleHashTable<K, V, KC>::GetValue(const K &key, std::vector<V> *r
 
   auto hash = Hash(key);
   auto dir_page_id = header_page->HashToDirectoryPageId(hash);
+  guard.Drop();
   if (dir_page_id == 0 || dir_page_id == static_cast<uint32_t>(INVALID_PAGE_ID)) {
     return false;
   }
@@ -80,6 +81,7 @@ auto DiskExtendibleHashTable<K, V, KC>::GetValue(const K &key, std::vector<V> *r
   if (bucket_page_id == 0 || bucket_page_id == static_cast<page_id_t>(INVALID_PAGE_ID)) {
     return false;
   }
+  guard.Drop();
 
   auto guard_bucket = bpm_->FetchPageWrite(bucket_page_id);
   auto bucket_page = guard_bucket.template As<ExtendibleHTableBucketPage<K, V, KC>>();
@@ -113,12 +115,12 @@ auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Tra
 
   // hash对应的那个directory page已经存在了
   guard = bpm_->FetchPageWrite(dir_page_id);
-  auto dir_page = guard.template AsMut<ExtendibleHTableDirectoryPage>();
-  dir_page->Init(directory_max_depth_);
-  auto bucket_page_id = dir_page->HashToBucketPageId(hash);
+  auto directory = guard.template AsMut<ExtendibleHTableDirectoryPage>();
+  directory->Init(directory_max_depth_);
+  auto bucket_page_id = directory->HashToBucketPageId(hash);
   if (bucket_page_id == 0 || bucket_page_id == static_cast<page_id_t>(INVALID_PAGE_ID)) {
-    auto idx = dir_page->HashToBucketIndex(hash);
-    return InsertToNewBucket(dir_page, idx, key, value);
+    auto idx = directory->HashToBucketIndex(hash);
+    return InsertToNewBucket(directory, idx, key, value);
   }
 
   auto guard_bucket = bpm_->FetchPageWrite(bucket_page_id);
@@ -127,58 +129,55 @@ auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Tra
     return false;
   }
   while (bucket_page->IsFull()) {
-    auto bucket_idx = dir_page->HashToBucketIndex(hash);
-    if (dir_page->GetLocalDepth(bucket_idx) >= dir_page->GetMaxDepth()) {
+    auto bucket_idx = directory->HashToBucketIndex(hash);
+    if (directory->GetLocalDepth(bucket_idx) >= directory->GetMaxDepth()) {
       // 如果bucket已经满了，已经无法再扩张了，那么就无法再插入键值对
       return false;
     }
 
     // 如果这个bucket_page已经满了，则需要将这个page切分成两份
-    auto image_idx = dir_page->GetSplitImageIndex(bucket_idx);
+    auto split_image_idx = directory->GetSplitImageIndex(bucket_idx);
 
     // create a new bucket page
-    page_id_t new_page_id;
-    bpm_->NewPageGuarded(&new_page_id);  // 自动UnpinPage
-    auto new_page_guard = bpm_->FetchPageWrite(new_page_id);
+    page_id_t split_page_id;
+    bpm_->NewPageGuarded(&split_page_id);  // 自动UnpinPage
+    auto new_page_guard = bpm_->FetchPageWrite(split_page_id);
     auto bucket_image_page = new_page_guard.AsMut<ExtendibleHTableBucketPage<K, V, KC>>();
     bucket_image_page->Init(bucket_max_size_);
 
     // 更新directory中的LD和bucket_page_id
-    auto local_depth = dir_page->GetLocalDepth(bucket_idx);
-    if (local_depth == dir_page->GetGlobalDepth()) {
+    auto local_depth = directory->GetLocalDepth(bucket_idx);
+    if (local_depth == directory->GetGlobalDepth()) {
       // 调用UpdateDirectoryMapping之前保证GD大于image_idx的LD(也是bucket_idx的LD)
-      dir_page->IncrGlobalDepth();
+      directory->IncrGlobalDepth();
     }
     // 注意：此时directory会有2^(GD-LD)个entry指向bucket_page。所有指向bucket_page的entry的LD和bucket_page_id都需要更新
     std::vector<uint32_t> bucket_idxes;  // 存储所有需要修改的entry的idx
-    auto ld_mask = dir_page->GetLocalDepthMask(image_idx);
-    for (uint32_t i = 0; i < (1 << dir_page->GetGlobalDepth()); i++) {
-      // 可以证明，肯有ld_mask & image_idx == ld_mask & bucket_idx
-      if ((ld_mask & i) == (ld_mask & image_idx)) {
+    auto ld_mask = directory->GetLocalDepthMask(split_image_idx);
+    for (uint32_t i = 0; i < (1 << directory->GetGlobalDepth()); i++) {
+      // 可以证明，肯有ld_mask & split_image_idx == ld_mask & bucket_idx
+      if ((ld_mask & i) == (ld_mask & split_image_idx)) {
         bucket_idxes.push_back(i);
       }
     }
     // 先更新LD
     // 实际上，image_idx和bucket_idx的local_depth_mask应该是相同的
-    for (const auto &i : bucket_idxes) {
-      // 可以证明，肯有ld_mask & image_idx == ld_mask & bucket_idx
-      dir_page->IncrLocalDepth(i);
-    }
-    // 再更新bucket_page_id
     bool do_update = false;
     for (const auto &i : bucket_idxes) {
+      // 可以证明，肯有ld_mask & split_image_idx == ld_mask & bucket_idx
+      directory->IncrLocalDepth(i);
       if (do_update) {
-        dir_page->SetBucketPageId(i, new_page_id);
+        directory->SetBucketPageId(i, split_page_id);
       }
       do_update = !do_update;
     }
 
     // 根据key将bucket_page中的一部分键值对迁移到bucket_image_page中
-    MigrateEntries(bucket_page, bucket_image_page, image_idx, dir_page->GetLocalDepthMask(image_idx));
+    MigrateEntries(bucket_page, bucket_image_page, split_image_idx, directory->GetLocalDepthMask(split_image_idx));
 
     // 如果键值对要插入的bucket是bucket_image_page
-    ld_mask = dir_page->GetLocalDepthMask(image_idx);
-    if ((hash & ld_mask) == (image_idx & ld_mask)) {
+    ld_mask = directory->GetLocalDepthMask(split_image_idx);
+    if ((hash & ld_mask) == (split_image_idx & ld_mask)) {
       bucket_page = bucket_image_page;
     }
   }
