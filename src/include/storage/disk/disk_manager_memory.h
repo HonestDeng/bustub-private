@@ -80,7 +80,6 @@ class DiskManagerUnlimitedMemory : public DiskManager {
    * @param page_data raw page data
    */
   void WritePage(page_id_t page_id, const char *page_data) override {
-    std::cout << "Enter WritePage" << std::endl;
     ProcessLatency(page_id);
 
     std::unique_lock<std::mutex> l(mutex_);
@@ -107,7 +106,6 @@ class DiskManagerUnlimitedMemory : public DiskManager {
    * @param[out] page_data output buffer
    */
   void ReadPage(page_id_t page_id, char *page_data) override {
-    std::cout << "Enter ReadPage" << std::endl;
     ProcessLatency(page_id);
 
     std::unique_lock<std::mutex> l(mutex_);

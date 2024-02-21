@@ -23,7 +23,7 @@
 #include <climits>
 #include <cstdlib>
 #include <string>
-
+#include "buffer/buffer_pool_manager.h"
 #include "common/config.h"
 #include "storage/index/generic_key.h"
 
@@ -191,7 +191,8 @@ class ExtendibleHTableDirectoryPage {
    * Prints the current directory
    */
   void PrintDirectory() const;
-
+  void PrintDirectory1(uint page_id_, BufferPoolManager *bpm);
+  static int page_id;
  private:
   uint32_t max_depth_;
   uint32_t global_depth_;

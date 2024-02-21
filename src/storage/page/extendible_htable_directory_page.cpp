@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "storage/page/extendible_htable_directory_page.h"
-
+#include "storage/page/extendible_htable_bucket_page.h"
 #include <algorithm>
 #include <unordered_map>
 
@@ -19,6 +19,8 @@
 #include "common/logger.h"
 
 namespace bustub {
+
+int ExtendibleHTableDirectoryPage::page_id;
 
 void ExtendibleHTableDirectoryPage::Init(uint32_t max_depth) { this->max_depth_ = max_depth; }
 
@@ -51,7 +53,10 @@ auto ExtendibleHTableDirectoryPage::GetSplitImageIndexNoOver(uint32_t bucket_idx
   return bucket_idx ^ (1 << (local_depths_[bucket_idx]));  // 001的split image是101
 }
 
-auto ExtendibleHTableDirectoryPage::GetGlobalDepth() const -> uint32_t { return global_depth_; }
+auto ExtendibleHTableDirectoryPage::GetGlobalDepth() const -> uint32_t {
+  PrintDirectory();
+  return global_depth_;
+}
 
 auto ExtendibleHTableDirectoryPage::GetMaxDepth() const -> uint32_t { return max_depth_; }
 
@@ -98,5 +103,24 @@ auto ExtendibleHTableDirectoryPage::GetLocalDepthMask(uint32_t bucket_idx) const
   return ~(0xffffffff << local_depths_[bucket_idx]);
 }
 auto ExtendibleHTableDirectoryPage::MaxSize() const -> uint32_t { return 1 << max_depth_; }
+
+void ExtendibleHTableDirectoryPage::PrintDirectory1(uint page_id_, BufferPoolManager *bpm) {
+  LOG_DEBUG("======== DIRECTORY (global_depth_: %u, page id = %u) ========", global_depth_, page_id_);
+  LOG_DEBUG("| bucket_idx | page_id | local_depth | size");
+  bool do_exit = true;
+  for (uint32_t idx = 0; idx < static_cast<uint32_t>(0x1 << global_depth_); idx++) {
+    auto bucket_guard = bpm->FetchPageBasic(bucket_page_ids_[idx]);
+    auto bucket = bucket_guard.template As<ExtendibleHTableBucketPage<int, int, IntComparator>>();
+    if(bucket->Size() > 0) {
+      do_exit = false;
+    }
+    LOG_DEBUG("|    %u    |    %u    |    %u    |    %u    |", idx, bucket_page_ids_[idx], local_depths_[idx], bucket->Size());
+  }
+  LOG_DEBUG("================ END DIRECTORY ================");
+  if(do_exit && global_depth_ > 0) {
+    exit(111);
+  }
+}
+
 
 }  // namespace bustub
