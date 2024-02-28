@@ -13,7 +13,7 @@
 
 namespace bustub {
 IndexScanExecutor::IndexScanExecutor(ExecutorContext *exec_ctx, const IndexScanPlanNode *plan)
-    : AbstractExecutor(exec_ctx) {}
+    : AbstractExecutor(exec_ctx), plan_(plan) {}
 
 void IndexScanExecutor::Init() {
   // throw NotImplementedException("SeqScanExecutor is not implemented");
@@ -31,15 +31,15 @@ auto IndexScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   cols.push_back(col);
   Schema schema(cols);
   Tuple key(values, &schema);
-  std::vector<RID> rids; // 根据Specification的说明，好像rids的最多只包含一个rid
+  std::vector<RID> rids;  // 根据Specification的说明，好像rids的最多只包含一个rid
   htable_->ScanKey(key, &rids, nullptr);
 
-  if(rids.empty()) {
+  if (rids.empty()) {
     return false;
   }
 
   auto pair = table_info_->table_->GetTuple(rids.front());
-  if(pair.first.is_deleted_) {
+  if (pair.first.is_deleted_) {
     return false;
   }
 
