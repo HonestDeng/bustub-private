@@ -21,6 +21,12 @@
 
 namespace bustub {
 
+class IteratorWrapper {
+  IteratorWrapper(TableInfo* tableInfo) {
+
+  }
+
+};
 /**
  * The SeqScanExecutor executor executes a sequential table scan.
  */
@@ -50,5 +56,6 @@ class SeqScanExecutor : public AbstractExecutor {
  private:
   /** The sequential scan plan node to be executed */
   const SeqScanPlanNode *plan_;
+  std::unique_ptr<TableIterator> iter_;
 };
 }  // namespace bustub
