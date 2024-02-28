@@ -41,6 +41,7 @@ auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     }
 
     // 删除tuple和索引
+    cnt++;
     auto meta = table_info->table_->GetTupleMeta(*rid);
     meta.is_deleted_ = true;
     table_info->table_->UpdateTupleMeta(meta, *rid);

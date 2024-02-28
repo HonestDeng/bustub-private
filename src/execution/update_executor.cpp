@@ -51,6 +51,7 @@ auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     }
 
     // 制造一个新的Value
+    cnt++;
     std::vector<Value> values;
     for (const auto &expr : plan_->target_expressions_) {  // target_expressions包括每一列的值吗?
       auto value = expr->Evaluate(&child_tuple, child_executor_->GetOutputSchema());
