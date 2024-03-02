@@ -29,6 +29,10 @@ void UpdateExecutor::Init() {
 }
 
 auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
+  if(executed) {
+    return false;
+  }
+  executed = true;
   Tuple child_tuple{};
   int cnt = 0;
   while (true) {

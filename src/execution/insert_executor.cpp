@@ -18,11 +18,18 @@ namespace bustub {
 
 InsertExecutor::InsertExecutor(ExecutorContext *exec_ctx, const InsertPlanNode *plan,
                                std::unique_ptr<AbstractExecutor> &&child_executor)
-    : AbstractExecutor(exec_ctx), child_executor_(std::move(child_executor)) {}
+    : AbstractExecutor(exec_ctx), plan_(plan), child_executor_(std::move(child_executor)) {}
 
 void InsertExecutor::Init() { child_executor_->Init(); }
 
 auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
+  if (executed_) {
+    // InsertExecutor的Next函数只能被执行一次
+    // 第一次执行返回true，以后的执行返回false
+    return false;
+  }
+  executed_ = true;
+
   Tuple child_tuple{};
   auto cata_log = exec_ctx_->GetCatalog();
   auto table_info = cata_log->GetTable(plan_->table_oid_);
