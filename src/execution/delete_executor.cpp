@@ -18,11 +18,15 @@ namespace bustub {
 
 DeleteExecutor::DeleteExecutor(ExecutorContext *exec_ctx, const DeletePlanNode *plan,
                                std::unique_ptr<AbstractExecutor> &&child_executor)
-    : AbstractExecutor(exec_ctx), child_executor_(std::move(child_executor)) {}
+    : AbstractExecutor(exec_ctx), plan_(plan), child_executor_(std::move(child_executor)) {}
 
 void DeleteExecutor::Init() { child_executor_->Init(); }
 
 auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
+  if(executed) {
+    return false;
+  }
+  executed = true;
   Tuple child_tuple{};
   auto catalog = exec_ctx_->GetCatalog();
   auto table_info = catalog->GetTable(plan_->table_oid_);
@@ -46,7 +50,16 @@ auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     meta.is_deleted_ = true;
     table_info->table_->UpdateTupleMeta(meta, *rid);
     for (auto &index_info : indexes_info) {
-      index_info->index_->DeleteEntry(child_tuple, *rid, nullptr);
+      std::vector<Value> values;
+      std::vector<Column> col_type;
+      for (auto key_idx : index_info->index_->GetKeyAttrs()) {
+        auto k = child_tuple.GetValue(&child_executor_->GetOutputSchema(), key_idx);
+        values.push_back(k);
+        col_type.emplace_back("key", k.GetTypeId());
+      }
+      Schema schema(col_type);
+      Tuple key(values, &schema);
+      index_info->index_->DeleteEntry(key, *rid, nullptr);
     }
   }
 }

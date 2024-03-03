@@ -44,9 +44,6 @@ DiskExtendibleHashTable<K, V, KC>::DiskExtendibleHashTable(const std::string &na
       header_max_depth_(header_max_depth),
       directory_max_depth_(directory_max_depth),
       bucket_max_size_(bucket_max_size) {
-  LOG_DEBUG(
-      "create a htable with buffer size = %zu, header_max_depth = %d, directory_max_depth = %d, bucket_max_size = %d",
-      bpm_->GetPoolSize(), header_max_depth, directory_max_depth, bucket_max_size);
   header_page_id_ = INVALID_PAGE_ID;
   bpm_->NewPageGuarded(&header_page_id_);
   auto guard = bpm_->FetchPageWrite(header_page_id_);
@@ -64,7 +61,6 @@ DiskExtendibleHashTable<K, V, KC>::DiskExtendibleHashTable(const std::string &na
 template <typename K, typename V, typename KC>
 auto DiskExtendibleHashTable<K, V, KC>::GetValue(const K &key, std::vector<V> *result, Transaction *transaction) const
     -> bool {
-  LOG_DEBUG("Enter GatValue with key = %u", Hash(key));
   auto guard = bpm_->FetchPageRead(header_page_id_);
   auto header_page = guard.template As<ExtendibleHTableHeaderPage>();
 
@@ -98,7 +94,7 @@ auto DiskExtendibleHashTable<K, V, KC>::GetValue(const K &key, std::vector<V> *r
  *****************************************************************************/
 template <typename K, typename V, typename KC>
 auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Transaction *transaction) -> bool {
-  //  LOG_DEBUG("Enter Insert with key = %u, value = %s", Hash(key), toString(value).c_str());
+    LOG_DEBUG("Enter Insert with key = %u", Hash(key));
   // 一个问题是，如果key已经出现过了应该怎么办？是拒绝插入，还是覆盖原来的value？
   auto guard = bpm_->FetchPageWrite(header_page_id_);
   auto header_page = guard.template AsMut<ExtendibleHTableHeaderPage>();

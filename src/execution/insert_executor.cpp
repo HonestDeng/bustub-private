@@ -52,7 +52,16 @@ auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     BUSTUB_ENSURE(r != std::nullopt, "Tuple size larger than page size");
     for (auto &index_info : indexes_info) {
       // 插入索引
-      index_info->index_->InsertEntry(child_tuple, r.value(), nullptr);
+      std::vector<Value> values;
+      std::vector<Column> col_type;
+      for (auto key_idx : index_info->index_->GetKeyAttrs()) {
+        auto k = child_tuple.GetValue(&child_executor_->GetOutputSchema(), key_idx);
+        values.push_back(k);
+        col_type.emplace_back("key", k.GetTypeId());
+      }
+      Schema schema(col_type);
+      Tuple key(values, &schema);
+      index_info->index_->InsertEntry(key, r.value(), nullptr);
     }
   }
 }

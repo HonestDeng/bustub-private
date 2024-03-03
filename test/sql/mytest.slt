@@ -1,0 +1,38 @@
+# 7 pts
+
+# Ensure all where-clauses in this file are transformed into index scan
+statement ok
+set force_optimizer_starter_rule=yes
+
+# Create a table
+statement ok
+create table t1(v1 int, v2 int, v3 int);
+
+query
+insert into t1 values (1, 50, 645), (2, 40, 721), (4, 20, 445), (5, 10, 445), (3, 30, 645);
+----
+5
+
+# Build index
+statement ok
+create index t1v1 on t1(v1);
+
+statement ok
+create index t1v2 on t1(v2);
+
+# Insert more elements
+query
+insert into t1 values (6, 0, 721), (7, -10, 645);
+----
+2
+
+# Update some elements
+query
+update t1 set v3 = 645, v1 = 8, v2 = -20 where v1 = 2;
+----
+1
+
+query +ensure:index_scan
+select * from t1 where v1 = 8;
+----
+8 -20 645

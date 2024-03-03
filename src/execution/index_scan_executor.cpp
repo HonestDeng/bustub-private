@@ -24,6 +24,12 @@ void IndexScanExecutor::Init() {
 }
 
 auto IndexScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
+  if (executed_) {
+    // InsertExecutor的Next函数只能被执行一次
+    // 第一次执行返回true，以后的执行返回false
+    return false;
+  }
+  executed_ = true;
   std::vector<Value> values;
   values.push_back(plan_->pred_key_->val_);
   Column col("key", INTEGER);
