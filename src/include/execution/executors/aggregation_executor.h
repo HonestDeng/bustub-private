@@ -44,6 +44,9 @@ class SimpleAggregationHashTable {
 
   /** @return The initial aggregate value for this aggregation executor */
   auto GenerateInitialAggregateValue() -> AggregateValue {
+    if (agg_exprs_.empty()) {
+      std::cout << "agg_exprs empty " << std::endl;
+    }
     std::vector<Value> values{};
     for (const auto &agg_type : agg_types_) {
       switch (agg_type) {
@@ -71,13 +74,55 @@ class SimpleAggregationHashTable {
    * @param input The input value
    */
   void CombineAggregateValues(AggregateValue *result, const AggregateValue &input) {
-    for (uint32_t i = 0; i < agg_exprs_.size(); i++) {
+    for (uint32_t i = 0; i < agg_types_.size(); i++) {
       switch (agg_types_[i]) {
         case AggregationType::CountStarAggregate:
+          // TODO: What if the table is empty ?
+          result->aggregates_[i] = result->aggregates_[i].Add(ValueFactory::GetIntegerValue(1));
+          break;
         case AggregationType::CountAggregate:
+          if (input.aggregates_[i].IsNull()) {
+            // 如果input的值是空，那么直接跳过
+            break;
+          }
+          if (result->aggregates_[i].IsNull()) {
+            // 如果原本的running val是null，那么就初始化为0
+            result->aggregates_[i] = ValueFactory::GetIntegerValue(0);
+          }
+          result->aggregates_[i] = result->aggregates_[i].Add(ValueFactory::GetIntegerValue(1));
+          break;
         case AggregationType::SumAggregate:
+          if (input.aggregates_[i].IsNull()) {
+            // 如果input的值是空，那么直接跳过
+            break;
+          }
+          if (result->aggregates_[i].IsNull()) {
+            // 如果原本的running val是null，那么就初始化为0
+            result->aggregates_[i] = ValueFactory::GetIntegerValue(0);
+          }
+          result->aggregates_[i] = result->aggregates_[i].Add(input.aggregates_[i]);
+          break;
         case AggregationType::MinAggregate:
+          if (input.aggregates_[i].IsNull()) {
+            // 如果input的值是空，那么直接跳过
+            break;
+          }
+          if (result->aggregates_[i].IsNull()) {
+            // 如果原本的running val是null，那么就初始化为0
+            result->aggregates_[i] = ValueFactory::GetIntegerValue(BUSTUB_INT32_MAX);
+          }
+          result->aggregates_[i] = result->aggregates_[i].Min(input.aggregates_[i]);
+          break;
         case AggregationType::MaxAggregate:
+          if (input.aggregates_[i].IsNull()) {
+            // 如果input的值是空，那么直接跳过
+            break;
+          }
+          if (result->aggregates_[i].IsNull()) {
+            // 如果原本的running val是null，那么就初始化为0
+            result->aggregates_[i] = ValueFactory::GetIntegerValue(-BUSTUB_INT32_MAX);
+          }
+          result->aggregates_[i] = result->aggregates_[i].Max(input.aggregates_[i]);
           break;
       }
     }
@@ -135,9 +180,10 @@ class SimpleAggregationHashTable {
   /** @return Iterator to the end of the hash table */
   auto End() -> Iterator { return Iterator{ht_.cend()}; }
 
- private:
   /** The hash table is just a map from aggregate keys to aggregate values */
   std::unordered_map<AggregateKey, AggregateValue> ht_{};
+
+ private:
   /** The aggregate expressions that we have */
   const std::vector<AbstractExpressionRef> &agg_exprs_;
   /** The types of aggregations that we have */
@@ -204,8 +250,10 @@ class AggregationExecutor : public AbstractExecutor {
 
   /** Simple aggregation hash table */
   // TODO(Student): Uncomment SimpleAggregationHashTable aht_;
+  std::unique_ptr<SimpleAggregationHashTable> aht_;
 
   /** Simple aggregation hash table iterator */
-  // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator aht_iterator_;
+  // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator iter_;
+  std::unique_ptr<SimpleAggregationHashTable::Iterator> iter_;
 };
 }  // namespace bustub
